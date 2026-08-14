@@ -60,6 +60,6 @@ export default class DesktopNotifications extends NotificationService {
    * @param notification - the notification to render.
    */
   notify(notification: Notification): Promise<void> {
-    return this.bridge.toast(notification.title, notification.body)
+    return this.bridge.toast(notification.title, notification.body, notification.sessionId)
   }
 }

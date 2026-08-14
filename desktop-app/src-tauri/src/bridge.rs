@@ -10,10 +10,13 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_updater::UpdaterExt;
 use tiny_http::{Header, Method, Response, Server, StatusCode};
+
+use crate::updater::{AvailableUpdate, CachedUpdate, UpdaterStateCache};
 
 /** Environment override for the bridge port; default 3901. */
 pub const ENV_BRIDGE_PORT: &str = "DSH_DESKTOP_BRIDGE_PORT";
@@ -102,8 +105,18 @@ fn route(app: &AppHandle, mut request: tiny_http::Request) -> Result<(), ()> {
     let mut body = String::new();
     let _ = request.as_reader().read_to_string(&mut body);
 
+    if method == Method::Get && url == "/api/desktop/update" {
+        update_state_handler(app.clone(), request);
+        return Ok(());
+    }
+    if method == Method::Post && url == "/api/desktop/update/apply" {
+        update_apply_handler(app.clone(), request);
+        return Ok(());
+    }
     let response = match (method, url.as_str()) {
         (Method::Post, "/api/desktop/toast") => toast(app, &body),
+        (Method::Get, "/update-manifest.json") => file_response("update-manifest.json", "application/json"),
+        (Method::Get, "/update-artifact") => file_response("update-artifact.exe", "application/octet-stream"),
         (Method::Post, "/api/desktop/pick-directory") => pick_directory(app),
         (Method::Get, url) if url.starts_with("/api/desktop/keychain/") => {
             keychain_get(&url["/api/desktop/keychain/".len()..])
@@ -114,8 +127,6 @@ fn route(app: &AppHandle, mut request: tiny_http::Request) -> Result<(), ()> {
         (Method::Delete, url) if url.starts_with("/api/desktop/keychain/") => {
             keychain_delete(&url["/api/desktop/keychain/".len()..])
         }
-        (Method::Get, "/api/desktop/update") => update_state(),
-        (Method::Post, "/api/desktop/update/apply") => update_apply(),
         _ => Response::from_string("not found").with_status_code(StatusCode(404)),
     };
     let _ = request.respond(response);
@@ -138,7 +149,21 @@ fn toast(app: &AppHandle, body: &str) -> Response<std::io::Cursor<Vec<u8>>> {
     let (Some(title), Some(text)) = (payload.get("title").and_then(|v| v.as_str()), payload.get("body").and_then(|v| v.as_str())) else {
         return json_response(400, serde_json::json!({ "error": "title and body are required" }));
     };
-    let _ = app.notification().builder().title(title).body(text).show();
+    let session_id = payload.get("sessionId").and_then(|v| v.as_str());
+    if let Some(id) = session_id {
+        if crate::deeplink::is_safe_session_id(id) {
+            if let Some(slot) = app.try_state::<crate::deeplink::PendingDeepLink>() {
+                if let Ok(mut guard) = slot.0.lock() {
+                    *guard = Some(id.to_string());
+                }
+            }
+        }
+    }
+    let mut builder = app.notification().builder().title(title).body(text);
+    if let Some(id) = session_id {
+        builder = builder.extra("sessionId", id);
+    }
+    let _ = builder.show();
     json_response(200, serde_json::json!({ "shown": true }))
 }
 
@@ -217,18 +242,100 @@ fn keychain_delete(name: &str) -> Response<std::io::Cursor<Vec<u8>>> {
     }
 }
 
-/** GET /api/desktop/update: stub state; the real Tauri Updater provider lands in the release milestone. */
-fn update_state() -> Response<std::io::Cursor<Vec<u8>>> {
-    json_response(200, serde_json::json!({
-        "channel": "manual",
-        "currentVersion": null,
-        "checkedAt": null,
-        "available": null,
-        "lastFailure": null,
-    }))
+/**
+ * Serve one self-hosted update file from the shell's working directory.
+ * @param filename - file to read.
+ * @param content_type - response content type.
+ * @returns the file bytes, or a 404 with an actionable message.
+ */
+fn file_response(filename: &str, content_type: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    match std::fs::read(filename) {
+        Ok(bytes) => {
+            let mut response = Response::from_data(bytes).with_status_code(StatusCode(200));
+            let _ = response.add_header(Header::from_bytes(&b"Content-Type"[..], content_type.as_bytes()).expect("static header parses"));
+            response
+        }
+        Err(_) => json_response(404, serde_json::json!({ "error": filename.to_string() + " is not self-hosted; run the build-and-sign script and restart the shell" })),
+    }
 }
 
-/** POST /api/desktop/update/apply: not implemented in the skeleton. */
-fn update_apply() -> Response<std::io::Cursor<Vec<u8>>> {
-    json_response(501, serde_json::json!({ "error": "apply is not implemented in the skeleton milestone" }))
+/**
+ * Run one updater check and answer with the cached wire state.
+ * @param app - application handle.
+ * @param request - the bridge request to answer.
+ */
+fn update_state_handler(app: AppHandle, request: tiny_http::Request) {
+    tauri::async_runtime::spawn(async move {
+        let current = app.package_info().version.to_string();
+        let outcome = check_updater(&app).await;
+        let cache = app.try_state::<UpdaterStateCache>();
+        if let Some(cache) = cache {
+            let mut guard = cache.0.lock().expect("updater cache lock held");
+            let previous = guard.clone();
+            *guard = Some(match outcome {
+                Ok(Some(update)) => CachedUpdate {
+                    checked_at_ms: epoch_ms(),
+                    available: Some(AvailableUpdate {
+                        version: update.version.clone(),
+                        published_at_ms: update.date.map(|d| d.unix_timestamp() * 1000).unwrap_or(0),
+                    }),
+                    last_failure: None,
+                },
+                Ok(None) => CachedUpdate {
+                    checked_at_ms: epoch_ms(),
+                    available: None,
+                    last_failure: None,
+                },
+                Err(message) => CachedUpdate {
+                    checked_at_ms: epoch_ms(),
+                    available: previous.and_then(|c| c.available),
+                    last_failure: Some(message),
+                },
+            });
+            let json = crate::updater::wire_state(&current, guard.as_ref());
+            drop(guard);
+            let _ = request.respond(json_response(200, json));
+        } else {
+            let _ = request.respond(json_response(500, serde_json::json!({ "error": "updater state missing" })));
+        }
+    });
+}
+
+/**
+ * Check the configured endpoints through the updater plugin.
+ * @param app - application handle.
+ * @returns the offered update, None when latest, or the failure.
+ */
+async fn check_updater(app: &AppHandle) -> Result<Option<tauri_plugin_updater::Update>, String> {
+    let updater = app.updater().map_err(|e| e.to_string())?;
+    updater.check().await.map_err(|e| e.to_string())
+}
+
+/**
+ * Download and install the offered update; the installer restarts the shell.
+ * @param app - application handle.
+ * @param request - the bridge request to answer before the installer runs.
+ */
+fn update_apply_handler(app: AppHandle, request: tiny_http::Request) {
+    tauri::async_runtime::spawn(async move {
+        let outcome = async {
+            let update = check_updater(&app).await?.ok_or_else(|| "no update available".to_string())?;
+            update
+                .download_and_install(|_chunk_len: usize, _total: Option<u64>| {}, || {})
+                .await
+                .map_err(|e| e.to_string())
+        }.await;
+        match outcome {
+            Ok(()) => { let _ = request.respond(json_response(200, serde_json::json!({ "applying": true }))); }
+            Err(message) => { let _ = request.respond(json_response(500, serde_json::json!({ "error": message }))); }
+        }
+    });
+}
+
+/** Current epoch milliseconds. */
+fn epoch_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }

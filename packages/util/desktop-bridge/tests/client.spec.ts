@@ -40,6 +40,19 @@ describe('DesktopBridge', () => {
     await done
   })
 
+  it('includes the session deep link when provided and omits it otherwise', async () => {
+    const stub = stubFetch()
+    const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })
+    const linked = bridge.toast('t', 'b', 'sess-1')
+    expect(JSON.parse(stub.calls[0]!.body!)).toEqual({ title: 't', body: 'b', sessionId: 'sess-1' })
+    stub.respond(200, { shown: true })
+    await linked
+    const plain = bridge.toast('t', 'b')
+    expect(JSON.parse(stub.calls[1]!.body!)).toEqual({ title: 't', body: 'b' })
+    stub.respond(200, { shown: true })
+    await plain
+  })
+
   it('maps a 404 keychain read to undefined and other statuses to errors', async () => {
     const stub = stubFetch()
     const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })
@@ -54,6 +67,20 @@ describe('DesktopBridge', () => {
     const refused = bridge.keychainGet('forbidden')
     stub.respond(401, { error: 'unauthorized' })
     await expect(refused).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('stores and deletes keychain secrets through the bridge', async () => {
+    const stub = stubFetch()
+    const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })
+    const set = bridge.keychainSet('K', 'v')
+    expect(stub.calls[0]).toMatchObject({ method: 'POST', url: 'http://127.0.0.1:3901/api/desktop/keychain/K' })
+    expect(JSON.parse(stub.calls[0]!.body!)).toEqual({ value: 'v' })
+    stub.respond(200, { stored: true })
+    await set
+    const del = bridge.keychainDelete('K')
+    expect(stub.calls[1]).toMatchObject({ method: 'DELETE' })
+    stub.respond(200, { deleted: true })
+    await del
   })
 
   it('rejects non-2xx answers with the shell-provided error', async () => {

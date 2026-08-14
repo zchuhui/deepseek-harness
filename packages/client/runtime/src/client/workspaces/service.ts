@@ -117,13 +117,17 @@ export class WorkspaceRuntime implements IWorkspaces {
 
   /**
    * Follow the first complete Workspace/Session baseline and select a default
-   * session exactly once. A restored current session wins; otherwise the most
-   * recent Workspace is connected (reusing or creating its blank session).
-   * Later explicit clears stay cleared instead of retriggering this startup
-   * policy. A failed connect may retry on the next baseline projection.
+   * session exactly once. A preferred deep-link session present in the list
+   * wins, even over a different restored current session; otherwise the
+   * restored current session wins; otherwise the most recent Workspace is
+   * connected (reusing or creating its blank session). An unknown preferred id
+   * falls back to the normal policy instead of breaking startup. Later
+   * explicit clears stay cleared instead of retriggering this startup policy.
+   * A failed connect may retry on the next baseline projection.
+   * @param preferredSessionId - deep-link session to open when present in the list.
    * @returns disposer for the baseline subscription; late work cannot navigate after disposal.
    */
-  startInitialSelection(): () => void {
+  startInitialSelection(preferredSessionId?: SessionId): () => void {
     if (this.initialSelectionStarted) {
       throw new Error('workspaces.startInitialSelection: already started')
     }
@@ -134,7 +138,14 @@ export class WorkspaceRuntime implements IWorkspaces {
       if (disposed || state !== 'waiting') return
       const workspace = this.list.getSnapshot()
       if (!workspace.baselinesReady) return
-      const current = this.sessions.list.getSnapshot().current
+      const sessions = this.sessions.list.getSnapshot()
+      const current = sessions.current
+      if (preferredSessionId !== undefined && sessions.byId[preferredSessionId] !== undefined) {
+        // Deep link beats the restored current; an identical current skips the redundant open.
+        if (preferredSessionId !== current) this.sessions.open(preferredSessionId)
+        state = 'done'
+        return
+      }
       const target = workspace.recentWorkspaceId
       if (current !== undefined || target === undefined) {
         state = 'done'

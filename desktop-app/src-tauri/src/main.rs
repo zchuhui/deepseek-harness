@@ -5,8 +5,10 @@
 
 mod bridge;
 mod commands;
+mod deeplink;
 mod runtime;
 mod tray;
+mod updater;
 
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 
@@ -14,7 +16,10 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(tray::QuitFlag::new())
+        .manage(deeplink::PendingDeepLink::new())
+        .manage(updater::UpdaterStateCache::new())
         .invoke_handler(tauri::generate_handler![commands::get_state, commands::toast, commands::pick_directory])
         .setup(|app| {
             let port = std::env::var(runtime::ENV_PORT)
@@ -32,6 +37,7 @@ fn main() {
             let _bridge = bridge::Bridge::start(handle, bridge_port, token.clone())?;
             std::mem::forget(_bridge); // lives for the application lifetime
 
+            app.manage(deeplink::WebPort(port));
             let start_dir = std::env::current_dir().unwrap_or_default();
             let spec = runtime::resolve_launch_spec(port, &start_dir)?;
             let mut manager = runtime::RuntimeManager::new(port, spec);

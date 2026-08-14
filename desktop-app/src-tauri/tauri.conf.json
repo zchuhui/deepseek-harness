@@ -13,8 +13,9 @@
     }
   },
   "bundle": {
-    "active": false,
-    "targets": "all",
+    "active": true,
+    "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -22,5 +23,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGOUNBMTc5MTkwMkY5N0YKUldSLytRSVplYUdjZjFWUUNBV04weXVycnBTSngxNHBSUXc2emlodXZqUTBCNC9qVms0YksxMnYK",
+      "endpoints": ["http://127.0.0.1:3901/update-manifest.json"],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

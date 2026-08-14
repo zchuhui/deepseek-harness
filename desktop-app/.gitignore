@@ -1,4 +1,11 @@
 node_modules/
 src-tauri/target/
+src-tauri/target-*/
 src-tauri/gen/
 *.log
+# Updater signing secrets: the private key never leaves the build machine.
+updater.key
+updater.key.pub
+# Generated updater self-hosting files.
+update-manifest.json
+update-artifact.exe

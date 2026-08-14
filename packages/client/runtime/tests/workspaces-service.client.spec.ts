@@ -594,4 +594,79 @@ describe('startInitialSelection', () => {
     expect(b.sessions.list.getSnapshot().current).toBe('s-retry')
     stop()
   })
+
+  it('opens a present preferred deep-link session without auto-connecting', async () => {
+    const b = bench()
+    const open = vi.spyOn(b.sessions, 'open')
+    const stop = b.workspaces.startInitialSelection(sid('s-target'))
+    b.api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('recent', [], '2026-01-02T00:00:00.000Z')] as never[],
+    }))
+    b.api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-target'), updatedAt: 1, running: false, blank: false }] as never[],
+    }))
+    await b.workspaces.refresh()
+    await b.sessions.refresh()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(open).toHaveBeenCalledWith(sid('s-target'))
+    expect(b.sessions.list.getSnapshot().current).toBe('s-target')
+    expect(b.api.callsOf('session.create')).toHaveLength(0)
+    stop()
+  })
+
+  it('falls back to connecting the recent Workspace when the preferred id is unknown', async () => {
+    const b = bench()
+    const stop = b.workspaces.startInitialSelection(sid('s-ghost'))
+    b.api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('recent', [], '2026-01-02T00:00:00.000Z')] as never[],
+    }))
+    b.api.onCreate = () => Promise.resolve(ok({ sessionId: sid('s-new') }))
+    await b.workspaces.refresh()
+    await b.sessions.refresh()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(b.api.callsOf('session.create')).toEqual([{ workspaceId: 'recent' }])
+    expect(b.sessions.list.getSnapshot().current).toBe('s-new')
+    stop()
+  })
+
+  it('does not reopen the current session when the preferred id matches it', async () => {
+    const b = bench()
+    b.api.onList = () => Promise.resolve(ok({
+      items: [{ sessionId: sid('s-target'), updatedAt: 1, running: false, blank: false }] as never[],
+    }))
+    await b.sessions.refresh()
+    b.sessions.open(sid('s-target'))
+    b.api.onWorkspaceList = () => Promise.resolve(ok({ items: [workspace('w1', [sid('s-target')])] as never[] }))
+    const open = vi.spyOn(b.sessions, 'open')
+    const stop = b.workspaces.startInitialSelection(sid('s-target'))
+    await b.workspaces.refresh()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(b.sessions.list.getSnapshot().current).toBe('s-target')
+    expect(open).not.toHaveBeenCalled()
+    expect(b.api.callsOf('session.create')).toHaveLength(0)
+    stop()
+  })
+
+  it('opens the preferred deep-link session over a restored current session', async () => {
+    const b = bench()
+    b.api.onList = () => Promise.resolve(ok({
+      items: [
+        { sessionId: sid('s-current'), updatedAt: 1, running: false, blank: false },
+        { sessionId: sid('s-target'), updatedAt: 2, running: false, blank: false },
+      ] as never[],
+    }))
+    await b.sessions.refresh()
+    b.sessions.open(sid('s-current'))
+    b.api.onWorkspaceList = () => Promise.resolve(ok({
+      items: [workspace('w1', [sid('s-current'), sid('s-target')])] as never[],
+    }))
+    const open = vi.spyOn(b.sessions, 'open')
+    const stop = b.workspaces.startInitialSelection(sid('s-target'))
+    await b.workspaces.refresh()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(b.sessions.list.getSnapshot().current).toBe('s-target')
+    expect(open).toHaveBeenCalledWith(sid('s-target'))
+    expect(b.api.callsOf('session.create')).toHaveLength(0)
+    stop()
+  })
 })

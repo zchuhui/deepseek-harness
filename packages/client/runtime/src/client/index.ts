@@ -11,6 +11,7 @@ import { SlotRegistry } from './slots.ts'
 import { SessionRuntime } from './sessions/service.ts'
 import type { SessionListState } from './sessions/service.ts'
 import { WorkspaceRuntime } from './workspaces/service.ts'
+import { deepLinkSessionId } from './workspaces/deep-link.ts'
 import type { ConversationSnapshot } from './sessions/conversation.ts'
 import type { UseProjection } from './sessions/projection-store.ts'
 import { ConversationEventRegistry } from './conversation/event-registry.ts'
@@ -197,8 +198,13 @@ export function apply(ctx: Context): void {
     identity: candidate => sessions.scopeOf(candidate),
   })
   const workspaces = new WorkspaceRuntime(ctx, connection.api, sessions)
+  // The desktop shell deep-links into a specific session via ?session=; absent
+  // a browser (node boot) there is no location search to read.
+  const preferredSessionId = typeof window === 'undefined'
+    ? undefined
+    : deepLinkSessionId(window.location.search) as SessionId | undefined
   ctx.effect(
-    () => workspaces.startInitialSelection(),
+    () => workspaces.startInitialSelection(preferredSessionId),
     'runtime: initial Workspace selection',
   )
   const loop = connection.start({

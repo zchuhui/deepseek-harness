@@ -90,9 +90,12 @@ export class DesktopBridge {
    * Show one native notification.
    * @param title - toast title.
    * @param body - toast body.
+   * @param sessionId - optional session the shell deep-links to when the notification is opened.
    */
-  async toast(title: string, body: string): Promise<void> {
-    await this.request('POST', '/api/desktop/toast', { title, body })
+  async toast(title: string, body: string, sessionId?: string): Promise<void> {
+    const payload: { title: string; body: string; sessionId?: string } = { title, body }
+    if (sessionId !== undefined) payload.sessionId = sessionId
+    await this.request('POST', '/api/desktop/toast', payload)
   }
 
   /**

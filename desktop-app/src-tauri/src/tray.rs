@@ -23,8 +23,9 @@ impl QuitFlag {
  */
 pub fn build(app: &AppHandle) -> Result<(), String> {
     let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>).map_err(|e| e.to_string())?;
+    let open_notification = MenuItem::with_id(app, "open-notification", "打开最新通知", true, None::<&str>).map_err(|e| e.to_string())?;
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>).map_err(|e| e.to_string())?;
-    let menu = Menu::with_items(app, &[&show, &quit]).map_err(|e| e.to_string())?;
+    let menu = Menu::with_items(app, &[&show, &open_notification, &quit]).map_err(|e| e.to_string())?;
 
     let mut builder = TrayIconBuilder::new();
     if let Some(icon) = app.default_window_icon().cloned() {
@@ -39,6 +40,35 @@ pub fn build(app: &AppHandle) -> Result<(), String> {
                     let _ = window.show();
                     let _ = window.unminimize();
                     let _ = window.set_focus();
+                }
+            }
+            "open-notification" => {
+                let target = {
+                    let mut result = None;
+                    if let Some(slot) = app.try_state::<crate::deeplink::PendingDeepLink>() {
+                        if let Ok(guard) = slot.0.lock() {
+                            result = guard.clone();
+                        }
+                    }
+                    result
+                };
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.unminimize();
+                    let _ = window.set_focus();
+                    if let Some(session) = target {
+                        let port = app
+                            .try_state::<crate::deeplink::WebPort>()
+                            .map(|state| state.0)
+                            .unwrap_or(crate::runtime::DEFAULT_PORT);
+                        if let Some(url) = crate::deeplink::deep_link_url(port, &session) {
+                            let script = format!(
+                                "window.location.href = {}",
+                                serde_json::to_string(&url).unwrap_or_else(|_| "null".to_string()),
+                            );
+                            let _ = window.eval(&script);
+                        }
+                    }
                 }
             }
             "quit" => {

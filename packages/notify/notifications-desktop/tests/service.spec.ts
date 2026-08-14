@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { TOKEN_HEADER } from '@deepseek-ai/dsh-desktop-bridge'
 import DesktopNotifications, { resolveSpec } from '../src/index.ts'
 
@@ -58,8 +59,9 @@ describe('DesktopNotifications', () => {
     await context.plugin(DesktopNotifications)
     expect(context.notifications).toBeInstanceOf(DesktopNotifications)
 
-    const done = context.notifications.notify({ kind: 'turn-failed', title: '回合失败', body: '请求失败' })
+    const done = context.notifications.notify({ kind: 'turn-failed', title: '回合失败', body: '请求失败', sessionId: SessionId('sess-9') })
     expect(stub.calls[0]).toMatchObject({ method: 'POST', url: 'http://127.0.0.1:3901/api/desktop/toast', token: 'secret' })
+    expect(JSON.parse(stub.calls[0]!.body!)).toEqual({ title: '回合失败', body: '请求失败', sessionId: 'sess-9' })
     stub.respond(200, { shown: true })
     await done
   })
