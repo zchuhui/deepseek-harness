@@ -1,0 +1,13 @@
+{
+  "name": "dsh-desktop-shell",
+  "version": "0.1.0-rc.5",
+  "private": true,
+  "description": "DeepSeek Harness desktop shell (Tauri 2): hosts the local dsh web runtime and the native bridge. Kept outside the root pnpm workspace by design (see README).",
+  "scripts": {
+    "tauri": "tauri",
+    "icon": "tauri icon icon-source.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.1.0"
+  }
+}

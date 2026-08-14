@@ -139,6 +139,8 @@
         "./packages/examples/*/src/invariant.ts",
         "./packages/util/*/src/invariant.ts",
         "./packages/mcp/*/src/invariant.ts",
+        "./packages/notify/*/src/invariant.ts",
+        "./packages/updater/*/src/invariant.ts",
         "./packages/identity/*/src/invariant.ts",
         "./packages/test-support/*/src/invariant.ts"
       ],
@@ -269,6 +271,8 @@
         "./packages/examples/*/src",
         "./packages/util/*/src",
         "./packages/mcp/*/src",
+        "./packages/notify/*/src",
+        "./packages/updater/*/src",
         "./packages/identity/*/src",
         "./packages/test-support/*/src",
         "./packages/host/*/src",
