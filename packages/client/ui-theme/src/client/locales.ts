@@ -6,6 +6,7 @@ export const zh = {
   'appearance.light': '浅色',
   'appearance.dark': '深色',
   'appearance.system': '跟随系统',
+  'appearance.glass-obsidian': '曜石玻璃',
 } satisfies Record<string, string>
 
 /** The settings.theme namespace key union. */
@@ -17,4 +18,5 @@ export const en = {
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
   'appearance.system': 'System',
+  'appearance.glass-obsidian': 'Obsidian Glass',
 } satisfies Record<ThemeKey, string>

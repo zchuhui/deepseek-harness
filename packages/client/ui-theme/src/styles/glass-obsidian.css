@@ -1,0 +1,68 @@
+/* Glass Obsidian is a built-in dark theme. Its values stay in CSS so the Host
+ * bootstrap can paint the first frame before the Client theme registry runs. */
+body[data-dsw-theme='glass-obsidian'] {
+  --dsw-alias-bg-base: rgba(7, 11, 22, 0.72);
+  --dsw-alias-bg-layer-1: rgba(14, 21, 39, 0.72);
+  --dsw-alias-bg-layer-2: rgba(18, 26, 47, 0.84);
+  --dsw-alias-bg-layer-3: rgba(22, 33, 59, 0.9);
+  --dsw-alias-bg-module-platform: rgba(42, 60, 101, 0.62);
+  --dsw-alias-bg-overlay: rgba(22, 33, 59, 0.94);
+  --dsw-alias-border-inverted: rgba(184, 207, 255, 0.22);
+  --dsw-alias-border-l1: rgba(184, 207, 255, 0.12);
+  --dsw-alias-border-l2-darkmode-thin: rgba(184, 207, 255, 0.15);
+  --dsw-alias-border-l2: rgba(184, 207, 255, 0.2);
+  --dsw-alias-border-l3: rgba(184, 207, 255, 0.28);
+  --dsw-alias-border-l4: rgba(184, 207, 255, 0.36);
+  --dsw-alias-brand-primary: rgb(139, 170, 255);
+  --dsw-alias-brand-text: rgb(139, 170, 255);
+  --dsw-alias-button-elevated-fill: rgba(52, 76, 133, 0.68);
+  --dsw-alias-button-floating-fill: rgba(58, 83, 143, 0.72);
+  --dsw-alias-button-floating-hover: rgba(81, 112, 186, 0.78);
+  --dsw-alias-interactive-bg-active: rgba(139, 170, 255, 0.22);
+  --dsw-alias-interactive-bg-hover-accent: rgba(139, 170, 255, 0.2);
+  --dsw-alias-interactive-bg-hover: rgba(184, 207, 255, 0.11);
+  --dsw-alias-label-caption: rgb(135, 151, 183);
+  --dsw-alias-label-primary: rgb(242, 246, 255);
+  --dsw-alias-label-secondary: rgb(184, 195, 217);
+  --dsw-alias-label-tertiary: rgb(151, 166, 196);
+  --dsw-alias-markdown-code-block: rgba(5, 9, 19, 0.82);
+  --dsw-alias-markdown-code-block-banner: rgba(11, 18, 34, 0.92);
+  --dsw-alias-scrollbar-bg-l1: rgba(184, 207, 255, 0.26);
+  --dsw-alias-scrollbar-bg-l2: rgba(184, 207, 255, 0.34);
+  --dsw-alias-scrollbar-hover-l1: rgba(184, 207, 255, 0.42);
+  --dsw-alias-scrollbar-hover-l2: rgba(184, 207, 255, 0.5);
+  --dsw-alias-tooltip-bg: rgba(31, 48, 90, 0.9);
+  --dsw-specific-bubble: rgba(72, 96, 164, 0.42);
+  --dsw-specific-input-major: rgba(18, 29, 53, 0.84);
+  --dsw-specific-menu: rgba(22, 33, 59, 0.92);
+  --dsw-specific-selector: rgba(51, 74, 128, 0.62);
+  --dsw-specific-sidebar-fill: rgba(12, 19, 36, 0.78);
+  --dsw-specific-sidebar-nav-item-active: rgba(72, 101, 173, 0.52);
+  --dsw-specific-sidebar-nav-item-active-accent: rgba(72, 101, 173, 0.44);
+  --dsw-specific-sidebar-nav-item-hover: rgba(112, 142, 214, 0.16);
+  --dsw-hovercard-bg: rgba(22, 33, 59, 0.92);
+  --dsw-glass-bubble-border: rgba(184, 207, 255, 0.12);
+  --dsw-glass-floating-border: rgba(184, 207, 255, 0.2);
+  --dsw-glass-backdrop-filter: blur(18px) saturate(125%);
+  --dsw-glass-shadow: 0 18px 48px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at 8% 8%, rgba(36, 87, 214, 0.3), transparent 30rem),
+    radial-gradient(circle at 92% 92%, rgba(113, 73, 216, 0.22), transparent 34rem),
+    rgb(7, 11, 22);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  body[data-dsw-theme='glass-obsidian'] {
+    --dsw-alias-bg-layer-1: rgb(14, 21, 39);
+    --dsw-alias-bg-layer-2: rgb(18, 26, 47);
+    --dsw-alias-bg-layer-3: rgb(22, 33, 59);
+    --dsw-specific-input-major: rgb(18, 29, 53);
+    --dsw-specific-menu: rgb(22, 33, 59);
+    --dsw-specific-selector: rgb(51, 74, 128);
+    --dsw-specific-sidebar-fill: rgb(12, 19, 36);
+    --dsw-specific-sidebar-nav-item-active: rgb(55, 78, 136);
+    --dsw-specific-sidebar-nav-item-active-accent: rgb(55, 78, 136);
+    --dsw-hovercard-bg: rgb(22, 33, 59);
+    --dsw-alias-tooltip-bg: rgb(31, 48, 90);
+  }
+}

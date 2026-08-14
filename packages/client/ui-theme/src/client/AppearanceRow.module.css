@@ -55,3 +55,11 @@
   background: var(--dsw-alias-bg-module-platform);
   border-color: var(--dsw-static-neutral-bluish-400);
 }
+
+/* The glass choice previews its fixed visual language without changing the
+ * shared theme until the user selects it. */
+.themeCube[data-theme-preview='glass-obsidian'] {
+  border-color: var(--dsw-alias-theme-preview-glass-border);
+  background: var(--dsw-alias-theme-preview-glass-background);
+  color: var(--dsw-alias-theme-preview-glass-label);
+}

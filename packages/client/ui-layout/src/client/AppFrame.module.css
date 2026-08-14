@@ -27,6 +27,8 @@
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
   border-right: 1px solid var(--dsw-alias-border-l1);
+  backdrop-filter: var(--dsw-glass-backdrop-filter, none);
+  -webkit-backdrop-filter: var(--dsw-glass-backdrop-filter, none);
 }
 
 .centerCol {

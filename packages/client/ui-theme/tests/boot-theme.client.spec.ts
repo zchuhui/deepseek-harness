@@ -6,6 +6,7 @@ import { injectBootTheme } from '../src/boot-theme.ts'
 import type { ThemePreference } from '../src/theme-settings.ts'
 
 const DARK_ATTRIBUTE = 'data-ds-dark-theme'
+const THEME_ATTRIBUTE = 'data-dsw-theme'
 
 function mockSystemDark(matches: boolean): void {
   vi.stubGlobal('matchMedia', vi.fn(() => ({ matches }) as MediaQueryList))
@@ -27,6 +28,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   document.documentElement.style.removeProperty('color-scheme')
   document.body.removeAttribute(DARK_ATTRIBUTE)
+  document.body.removeAttribute(THEME_ATTRIBUTE)
 })
 
 describe('theme boot index transform', () => {
@@ -37,6 +39,7 @@ describe('theme boot index transform', () => {
     expect(html.indexOf('<script>')).toBeLessThan(html.indexOf('<div id="root">'))
     expect(document.documentElement.style.colorScheme).toBe('dark')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(true)
+    expect(document.body.getAttribute(THEME_ATTRIBUTE)).toBe('dark')
   })
 
   it('lets durable light override a dark OS and clears stale dark state', () => {
@@ -62,6 +65,15 @@ describe('theme boot index transform', () => {
     executeBootstrap()
     expect(document.documentElement.style.colorScheme).toBe('light')
     expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(false)
+    expect(document.body.getAttribute(THEME_ATTRIBUTE)).toBe('light')
+  })
+
+  it('applies the durable glass theme before the plugin tree activates', () => {
+    mockSystemDark(false)
+    executeBootstrap('glass-obsidian')
+    expect(document.documentElement.style.colorScheme).toBe('dark')
+    expect(document.body.hasAttribute(DARK_ATTRIBUTE)).toBe(true)
+    expect(document.body.getAttribute(THEME_ATTRIBUTE)).toBe('glass-obsidian')
   })
 
   it('appends the script to a body-less fragment', () => {

@@ -167,6 +167,12 @@ body {
   --dsw-alias-bg-multi-select: var(--dsw-static-neutral-bluish-60);
   --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-150);
   --dsw-alias-bg-skeleton: rgba(0, 0, 0, 0.04);
+  --dsw-alias-theme-preview-glass-background:
+    radial-gradient(circle at 20% 10%, rgba(36, 87, 214, 0.38), transparent 48%),
+    radial-gradient(circle at 80% 100%, rgba(113, 73, 216, 0.28), transparent 56%),
+    rgba(7, 11, 22, 0.86);
+  --dsw-alias-theme-preview-glass-border: rgba(139, 170, 255, 0.36);
+  --dsw-alias-theme-preview-glass-label: rgb(242, 246, 255);
   --dsw-alias-border-inverted2: rgba(0, 0, 0, 0);
   --dsw-alias-border-inverted: rgba(0, 0, 0, 0);
   --dsw-alias-border-l1: rgba(0, 0, 0, 0.04);
@@ -259,6 +265,12 @@ body[data-ds-dark-theme] {
   --dsw-alias-bg-multi-select: var(--dsw-static-neutral-850);
   --dsw-alias-bg-overlay: var(--dsw-static-neutral-bluish-700);
   --dsw-alias-bg-skeleton: rgba(255, 255, 255, 0.08);
+  --dsw-alias-theme-preview-glass-background:
+    radial-gradient(circle at 20% 10%, rgba(36, 87, 214, 0.38), transparent 48%),
+    radial-gradient(circle at 80% 100%, rgba(113, 73, 216, 0.28), transparent 56%),
+    rgba(7, 11, 22, 0.86);
+  --dsw-alias-theme-preview-glass-border: rgba(139, 170, 255, 0.36);
+  --dsw-alias-theme-preview-glass-label: rgb(242, 246, 255);
   --dsw-alias-border-inverted2: rgba(255, 255, 255, 0.08);
   --dsw-alias-border-inverted: rgba(255, 255, 255, 0.06);
   --dsw-alias-border-l1: rgba(255, 255, 255, 0.06);

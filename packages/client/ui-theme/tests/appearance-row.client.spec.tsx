@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** AppearanceRow behavior: three cubes, selection follows the persisted
+/** AppearanceRow behavior: built-in cubes, selection follows the persisted
  * preference, clicks drive setTheme. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -17,6 +17,7 @@ const COPY: Record<string, string> = {
   'appearance.light': 'Light',
   'appearance.dark': 'Dark',
   'appearance.system': 'System',
+  'appearance.glass-obsidian': 'Obsidian Glass',
 }
 
 /** Empty global standard-kit hooks (the row reads neither). */
@@ -54,12 +55,21 @@ const pressed = (name: RegExp): string | null =>
   screen.getByRole('button', { name }).getAttribute('aria-pressed')
 
 describe('AppearanceRow', () => {
-  it('renders the title and three cubes with the preference cube selected', () => {
+  it('renders every built-in theme with the preference cube selected', () => {
     mount('dark')
     expect(screen.getByText('Appearance')).toBeDefined()
     expect(pressed(/Dark/)).toBe('true')
     expect(pressed(/Light/)).toBe('false')
     expect(pressed(/System/)).toBe('false')
+    expect(pressed(/Obsidian Glass/)).toBe('false')
+  })
+
+  it('routes the Glass Obsidian choice through the persisted preference face', () => {
+    const b = mount('dark')
+    fireEvent.click(screen.getByRole('button', { name: /Obsidian Glass/ }))
+    expect(b.setTheme).toHaveBeenCalledWith('glass-obsidian')
+    act(() => { b.store.actions.sync('glass-obsidian', 1) })
+    expect(pressed(/Obsidian Glass/)).toBe('true')
   })
 
   it('click drives setTheme; selection follows the store mirror, not the click echo', () => {

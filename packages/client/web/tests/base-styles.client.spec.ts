@@ -1,8 +1,8 @@
 /**
  * Shell base sheet contract, asserted against the CSS text on disk: base.css is
  * where the ui-theme token sheets enter the bundle, every sheet it names exists,
- * and scrollbar.css follows design-platform.css because it reads that sheet's
- * tokens.
+ * and each theme override sheet sits between design-platform.css and the
+ * scrollbar consumer that reads its tokens.
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -39,6 +39,10 @@ function resolveThemeSheet(specifier: string): string {
 }
 
 const imports = importOrder(baseCss)
+const glassCss = readFileSync(
+  fileURLToPath(new URL('../../ui-theme/src/styles/glass-obsidian.css', import.meta.url)),
+  'utf8',
+)
 
 describe('web shell base.css', () => {
   it('publishes theme sheets from the built artifact plane', () => {
@@ -54,13 +58,22 @@ describe('web shell base.css', () => {
     }
   })
 
-  it('imports the scrollbar sheet after the token sheet it reads', () => {
+  it('imports theme overrides after their token base and before scrollbar consumers', () => {
     // Both sheets bind on `body`, so with scrollbar.css first the alias tokens
     // would still resolve; the order encodes the dependency direction so a
     // later specificity or selector change cannot silently invert it.
     const platform = imports.indexOf(`${THEME_PACKAGE}/styles/design-platform.css`)
+    const glass = imports.indexOf(`${THEME_PACKAGE}/styles/glass-obsidian.css`)
     const scrollbar = imports.indexOf(`${THEME_PACKAGE}/styles/scrollbar.css`)
     expect(platform).toBeGreaterThanOrEqual(0)
+    expect(glass).toBeGreaterThan(platform)
     expect(scrollbar).toBeGreaterThan(platform)
+    expect(scrollbar).toBeGreaterThan(glass)
+  })
+
+  it('gives navigation, floating controls, and tooltips the Glass Obsidian surface', () => {
+    expect(glassCss).toContain('--dsw-specific-sidebar-nav-item-active: rgba(72, 101, 173, 0.52)')
+    expect(glassCss).toContain('--dsw-alias-button-floating-fill: rgba(58, 83, 143, 0.72)')
+    expect(glassCss).toContain('--dsw-alias-tooltip-bg: rgba(31, 48, 90, 0.9)')
   })
 })

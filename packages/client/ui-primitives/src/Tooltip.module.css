@@ -14,8 +14,12 @@
   width: max-content;
   max-width: 50vw;
   padding: 3px 7px;
+  border: 1px solid var(--dsw-glass-floating-border, transparent);
   border-radius: 8px;
   background: var(--dsw-alias-tooltip-bg);
+  box-shadow: var(--dsw-glass-shadow, none);
+  backdrop-filter: var(--dsw-glass-backdrop-filter, none);
+  -webkit-backdrop-filter: var(--dsw-glass-backdrop-filter, none);
   color: var(--dsw-static-neutral-bluish-00);
   font-size: 13px;
   line-height: 20px;
