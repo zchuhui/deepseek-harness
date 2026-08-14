@@ -5560,6 +5560,9 @@ importers:
       '@deepseek-ai/dsh-notifications':
         specifier: workspace:^
         version: link:../notifications
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
 
   packages/notify/notifications-terminal:
     devDependencies:
