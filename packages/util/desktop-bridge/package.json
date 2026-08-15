@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-desktop-bridge",
-  "description": "Zero-dependency typed client for the desktop shell native bridge (toast, directory picker, keychain, updater)",
+  "description": "Zero-dependency typed client for the desktop shell native bridge (toast, directory picker, keychain, windows, settings, updater)",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

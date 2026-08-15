@@ -46,8 +46,7 @@ pub fn find_checkout_root(start: &Path) -> Option<PathBuf> {
         let pkg = current.join("package.json");
         if let Ok(mut file) = File::open(&pkg) {
             let mut text = String::new();
-            if file.read_to_string(&mut text).is_ok()
-                && text.contains("\"@deepseek-ai/dsh-root\"")
+            if file.read_to_string(&mut text).is_ok() && text.contains("\"@deepseek-ai/dsh-root\"")
             {
                 return Some(current);
             }
@@ -93,13 +92,32 @@ pub fn resolve_launch_spec(port: u16, start: &Path) -> Result<LaunchSpec, String
     }
     // dsh on PATH: the npm shim is dsh.cmd on Windows and must run through cmd.
     let (program, args) = if which("dsh.cmd").is_some() {
-        ("cmd".to_string(), vec!["/C".to_string(), "dsh.cmd".to_string(), "web".to_string(), "--port".to_string(), port.to_string()])
+        (
+            "cmd".to_string(),
+            vec![
+                "/C".to_string(),
+                "dsh.cmd".to_string(),
+                "web".to_string(),
+                "--port".to_string(),
+                port.to_string(),
+            ],
+        )
     } else if which("dsh").is_some() {
-        ("dsh".to_string(), vec!["web".to_string(), "--port".to_string(), port.to_string()])
+        (
+            "dsh".to_string(),
+            vec!["web".to_string(), "--port".to_string(), port.to_string()],
+        )
     } else {
-        return Err("dsh not found: run pnpm build in the checkout or npm i -g @deepseek-ai/dsh".to_string());
+        return Err(
+            "dsh not found: run pnpm build in the checkout or npm i -g @deepseek-ai/dsh"
+                .to_string(),
+        );
     };
-    Ok(LaunchSpec { program, args, cwd: start.to_path_buf() })
+    Ok(LaunchSpec {
+        program,
+        args,
+        cwd: start.to_path_buf(),
+    })
 }
 
 /** Whether an executable named name is found on PATH. */
@@ -117,7 +135,9 @@ fn which(name: &str) -> Option<PathBuf> {
 /** Whether a TCP connection to 127.0.0.1:port is accepted. */
 pub fn tcp_connect_ok(port: u16) -> bool {
     TcpStream::connect_timeout(
-        &format!("127.0.0.1:{port}").parse().expect("loopback address parses"),
+        &format!("127.0.0.1:{port}")
+            .parse()
+            .expect("loopback address parses"),
         Duration::from_millis(1500),
     )
     .is_ok()
@@ -132,7 +152,9 @@ pub fn tcp_connect_ok(port: u16) -> bool {
  */
 pub fn http_any_response(port: u16) -> bool {
     let mut stream = match TcpStream::connect_timeout(
-        &format!("127.0.0.1:{port}").parse().expect("loopback address parses"),
+        &format!("127.0.0.1:{port}")
+            .parse()
+            .expect("loopback address parses"),
         Duration::from_secs(2),
     ) {
         Ok(stream) => stream,
@@ -175,7 +197,11 @@ impl RuntimeManager {
      * @param spec - resolved launch command.
      */
     pub fn new(port: u16, spec: LaunchSpec) -> Self {
-        Self { port, spec, child: None }
+        Self {
+            port,
+            spec,
+            child: None,
+        }
     }
 
     /**
@@ -240,7 +266,9 @@ fn kill_tree(child: &Child) {
     }
     #[cfg(not(windows))]
     {
-        let _ = Command::new("kill").args(["-TERM", &child.id().to_string()]).spawn();
+        let _ = Command::new("kill")
+            .args(["-TERM", &child.id().to_string()])
+            .spawn();
     }
 }
 
@@ -250,7 +278,8 @@ mod tests {
     use std::net::TcpListener;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("dsh-desktop-test-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("dsh-desktop-test-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("temp dir creates");
         dir
@@ -259,7 +288,11 @@ mod tests {
     #[test]
     fn finds_a_checkout_root_by_package_name() {
         let root = temp_dir("checkout");
-        std::fs::write(root.join("package.json"), "{\n  \"name\": \"@deepseek-ai/dsh-root\"\n}\n").unwrap();
+        std::fs::write(
+            root.join("package.json"),
+            "{\n  \"name\": \"@deepseek-ai/dsh-root\"\n}\n",
+        )
+        .unwrap();
         let nested = root.join("a").join("b");
         std::fs::create_dir_all(&nested).unwrap();
         assert_eq!(find_checkout_root(&nested), Some(root.clone()));
@@ -325,7 +358,11 @@ mod tests {
                 }
             }
         });
-        let spec = LaunchSpec { program: "node".into(), args: vec!["--version".into()], cwd: temp_dir("reuse") };
+        let spec = LaunchSpec {
+            program: "node".into(),
+            args: vec!["--version".into()],
+            cwd: temp_dir("reuse"),
+        };
         let mut manager = RuntimeManager::new(port, spec);
         assert_eq!(manager.start(&[]), Ok(StartOutcome::Reused));
         stop.store(true, Ordering::Relaxed);
@@ -336,7 +373,11 @@ mod tests {
     fn start_fails_when_the_port_is_occupied_without_http() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
-        let spec = LaunchSpec { program: "node".into(), args: vec!["--version".into()], cwd: temp_dir("occupied") };
+        let spec = LaunchSpec {
+            program: "node".into(),
+            args: vec!["--version".into()],
+            cwd: temp_dir("occupied"),
+        };
         let mut manager = RuntimeManager::new(port, spec);
         assert!(manager.start(&[]).is_err());
     }

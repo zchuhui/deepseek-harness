@@ -81,7 +81,10 @@ mod tests {
     fn maps_a_successful_check_with_an_offer() {
         let cached = CachedUpdate {
             checked_at_ms: 100,
-            available: Some(AvailableUpdate { version: "0.2.0".to_string(), published_at_ms: 200 }),
+            available: Some(AvailableUpdate {
+                version: "0.2.0".to_string(),
+                published_at_ms: 200,
+            }),
             last_failure: None,
         };
         assert_eq!(

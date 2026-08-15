@@ -130,6 +130,52 @@ describe('DesktopBridge', () => {
     expect(seen).not.toBe(controller.signal)
   })
 
+  it('opens, focuses, closes, and lists windows through the bridge', async () => {
+    const stub = stubFetch()
+    const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })
+    const opened = bridge.openWindow('sess-9')
+    expect(stub.calls[0]).toMatchObject({ method: 'POST', url: 'http://127.0.0.1:3901/api/desktop/windows/open' })
+    expect(JSON.parse(stub.calls[0]!.body!)).toEqual({ sessionId: 'sess-9' })
+    stub.respond(200, { label: 'win-0', sessionId: 'sess-9' })
+    expect(await opened).toBe('win-0')
+
+    const plain = bridge.openWindow()
+    expect(JSON.parse(stub.calls[1]!.body!)).toEqual({})
+    stub.respond(200, { label: 'win-1', sessionId: null })
+    expect(await plain).toBe('win-1')
+
+    const focused = bridge.focusWindow('win-0')
+    expect(stub.calls[2]).toMatchObject({ method: 'POST', url: 'http://127.0.0.1:3901/api/desktop/windows/focus' })
+    expect(JSON.parse(stub.calls[2]!.body!)).toEqual({ label: 'win-0' })
+    stub.respond(200, { focused: true })
+    await focused
+
+    const closed = bridge.closeWindow('win-0')
+    expect(stub.calls[3]).toMatchObject({ method: 'POST', url: 'http://127.0.0.1:3901/api/desktop/windows/close' })
+    stub.respond(200, { closed: true })
+    await closed
+
+    const listed = bridge.listWindows()
+    expect(stub.calls[4]).toMatchObject({ method: 'GET', url: 'http://127.0.0.1:3901/api/desktop/windows' })
+    stub.respond(200, { windows: [{ label: 'main', sessionId: null }] })
+    expect(await listed).toEqual([{ label: 'main', sessionId: null }])
+  })
+
+  it('fetches and applies the shell settings document', async () => {
+    const stub = stubFetch()
+    const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })
+    const fetched = bridge.getSettings()
+    expect(stub.calls[0]).toMatchObject({ method: 'GET', url: 'http://127.0.0.1:3901/api/desktop/settings' })
+    stub.respond(200, { closeToTray: true, launchAtLogin: false })
+    expect(await fetched).toEqual({ closeToTray: true, launchAtLogin: false })
+
+    const applied = bridge.setSettings({ launchAtLogin: true })
+    expect(stub.calls[1]).toMatchObject({ method: 'POST', url: 'http://127.0.0.1:3901/api/desktop/settings' })
+    expect(JSON.parse(stub.calls[1]!.body!)).toEqual({ launchAtLogin: true })
+    stub.respond(200, { closeToTray: true, launchAtLogin: true })
+    expect(await applied).toEqual({ closeToTray: true, launchAtLogin: true })
+  })
+
   it('returns the picked path or null on cancel', async () => {
     const stub = stubFetch()
     const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })

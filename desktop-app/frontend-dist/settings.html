@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>设置</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: system-ui, "Segoe UI", "Microsoft YaHei", sans-serif;
+      margin: 0;
+      padding: 20px 24px;
+      font-size: 14px;
+      user-select: none;
+    }
+    h1 { font-size: 16px; margin: 0 0 8px; }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(128, 128, 128, 0.25);
+    }
+    .row label { display: flex; flex-direction: column; gap: 2px; }
+    .hint { font-size: 12px; opacity: 0.65; }
+    input[type="checkbox"] { width: 16px; height: 16px; accent-color: #4d6bfe; }
+    .status { margin-top: 14px; font-size: 12px; opacity: 0.7; min-height: 1.2em; }
+    .status.error { color: #d64545; opacity: 1; }
+    footer { margin-top: 10px; font-size: 12px; opacity: 0.5; }
+  </style>
+</head>
+<body>
+  <h1>设置</h1>
+  <div class="row">
+    <label for="closeToTray">关闭时最小化到托盘<span class="hint">关闭主窗口时隐藏而不是退出</span></label>
+    <input type="checkbox" id="closeToTray" />
+  </div>
+  <div class="row">
+    <label for="launchAtLogin">开机自启<span class="hint">登录 Windows 时自动启动 DeepSeek Harness</span></label>
+    <input type="checkbox" id="launchAtLogin" />
+  </div>
+  <div id="status" class="status" role="status"></div>
+  <footer id="version"></footer>
+  <script>
+    const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args)
+    const status = document.getElementById('status')
+    function fail(message) {
+      status.textContent = message
+      status.classList.add('error')
+    }
+    function save(key, value) {
+      invoke('set_settings', { [key]: value })
+        .then((next) => {
+          document.getElementById('closeToTray').checked = next.closeToTray
+          document.getElementById('launchAtLogin').checked = next.launchAtLogin
+          status.classList.remove('error')
+          status.textContent = '已保存'
+        })
+        .catch((error) => fail('保存失败: ' + String(error)))
+    }
+    function load() {
+      Promise.all([invoke('get_settings'), invoke('get_state')])
+        .then(([settings, state]) => {
+          document.getElementById('closeToTray').checked = settings.closeToTray
+          document.getElementById('launchAtLogin').checked = settings.launchAtLogin
+          document.getElementById('version').textContent = 'dsh-desktop ' + state.version
+        })
+        .catch((error) => fail('读取设置失败: ' + String(error)))
+    }
+    document.getElementById('closeToTray').addEventListener('change', (event) => save('closeToTray', event.target.checked))
+    document.getElementById('launchAtLogin').addEventListener('change', (event) => save('launchAtLogin', event.target.checked))
+    load()
+  </script>
+</body>
+</html>

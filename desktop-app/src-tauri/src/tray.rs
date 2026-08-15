@@ -1,5 +1,6 @@
-//! System tray: show-window and quit menu; the main window hides instead of
-//! closing until quit is chosen.
+//! System tray: show-window, new-window, open-latest-notification, settings,
+//! and quit menu; the main window hides instead of closing until quit is
+//! chosen (or quits outright when close-to-tray is off).
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -22,10 +23,22 @@ impl QuitFlag {
  * @returns an error string when the tray cannot be built.
  */
 pub fn build(app: &AppHandle) -> Result<(), String> {
-    let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>).map_err(|e| e.to_string())?;
-    let open_notification = MenuItem::with_id(app, "open-notification", "打开最新通知", true, None::<&str>).map_err(|e| e.to_string())?;
-    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>).map_err(|e| e.to_string())?;
-    let menu = Menu::with_items(app, &[&show, &open_notification, &quit]).map_err(|e| e.to_string())?;
+    let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let new_window = MenuItem::with_id(app, "new-window", "新建窗口", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let open_notification =
+        MenuItem::with_id(app, "open-notification", "打开最新通知", true, None::<&str>)
+            .map_err(|e| e.to_string())?;
+    let settings = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let quit =
+        MenuItem::with_id(app, "quit", "退出", true, None::<&str>).map_err(|e| e.to_string())?;
+    let menu = Menu::with_items(
+        app,
+        &[&show, &new_window, &open_notification, &settings, &quit],
+    )
+    .map_err(|e| e.to_string())?;
 
     let mut builder = TrayIconBuilder::new();
     if let Some(icon) = app.default_window_icon().cloned() {
@@ -42,6 +55,13 @@ pub fn build(app: &AppHandle) -> Result<(), String> {
                     let _ = window.set_focus();
                 }
             }
+            "new-window" => {
+                let port = app
+                    .try_state::<crate::deeplink::WebPort>()
+                    .map(|state| state.0)
+                    .unwrap_or(crate::runtime::DEFAULT_PORT);
+                let _ = crate::windows::open_window(app, None, port);
+            }
             "open-notification" => {
                 let target = {
                     let mut result = None;
@@ -52,33 +72,40 @@ pub fn build(app: &AppHandle) -> Result<(), String> {
                     }
                     result
                 };
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_focus();
-                    if let Some(session) = target {
-                        let port = app
-                            .try_state::<crate::deeplink::WebPort>()
-                            .map(|state| state.0)
-                            .unwrap_or(crate::runtime::DEFAULT_PORT);
-                        if let Some(url) = crate::deeplink::deep_link_url(port, &session) {
-                            let script = format!(
-                                "window.location.href = {}",
-                                serde_json::to_string(&url).unwrap_or_else(|_| "null".to_string()),
-                            );
-                            let _ = window.eval(&script);
+                match target {
+                    Some(session) => crate::windows::route_deep_link(
+                        app,
+                        &crate::deeplink::DeepLinkTarget::Session(session),
+                    ),
+                    None => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
                         }
                     }
                 }
             }
+            "settings" => {
+                if let Err(error) = crate::settings::open_settings_window(app) {
+                    eprintln!("dsh-desktop: {error}");
+                }
+            }
             "quit" => {
-                app.state::<QuitFlag>().0.store(true, std::sync::atomic::Ordering::Relaxed);
+                app.state::<QuitFlag>()
+                    .0
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
                 app.exit(0);
             }
-            _ => {},
+            _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let tauri::tray::TrayIconEvent::Click { button: tauri::tray::MouseButton::Left, button_state: tauri::tray::MouseButtonState::Up, .. } = event {
+            if let tauri::tray::TrayIconEvent::Click {
+                button: tauri::tray::MouseButton::Left,
+                button_state: tauri::tray::MouseButtonState::Up,
+                ..
+            } = event
+            {
                 if let Some(window) = tray.app_handle().get_webview_window("main") {
                     let _ = window.show();
                     let _ = window.set_focus();

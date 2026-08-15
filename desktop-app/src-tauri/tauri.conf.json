@@ -7,6 +7,7 @@
     "frontendDist": "../frontend-dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [],
     "security": {
       "csp": null
@@ -25,6 +26,11 @@
     ]
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["dsh"]
+      }
+    },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGOUNBMTc5MTkwMkY5N0YKUldSLytRSVplYUdjZjFWUUNBV04weXVycnBTSngxNHBSUXc2emlodXZqUTBCNC9qVms0YksxMnYK",
       "endpoints": ["http://127.0.0.1:3901/update-manifest.json"],

@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-桌面壳原生桥接的零依赖类型化客户端:一条带 token 鉴权的回环 HTTP API,让 dsh 宿主侧 provider 触达 toast、目录选择、keychain 与 updater 原语。线上契约由 `desktop-app/README.md` 拥有;本包只做客户端类型化。
+桌面壳原生桥接的零依赖类型化客户端:一条带 token 鉴权的回环 HTTP API,让 dsh 宿主侧 provider 触达 toast、目录选择、keychain、窗口、设置与 updater 原语。线上契约由 `desktop-app/README.md` 拥有;本包只做客户端类型化。
 
 纯库,非插件:无 ctx,除连接参数外无状态。每个请求携带头 `x-dsh-bridge-token`(当次运行的 token);非 2xx 应答以 `DesktopBridgeError`(状态码 + 壳提供的消息)reject,传输失败以 fetch 错误 reject,keychain 读取 404 解析为 `undefined`。
 

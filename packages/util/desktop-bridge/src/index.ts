@@ -1,8 +1,8 @@
 /**
  * Zero-dependency typed client for the desktop shell's native bridge: a
  * token-guarded loopback HTTP API through which dsh host providers reach
- * toast, directory-picker, keychain, and updater primitives. The contract
- * is owned by desktop-app/README.md; this package only types the client.
+ * toast, directory-picker, keychain, window, and updater primitives. The
+ * contract is owned by desktop-app/README.md; this package only types the client.
  * A library, not a plugin: no ctx, no state beyond the connection options.
  * @module @deepseek-ai/dsh-desktop-bridge
  */
@@ -67,6 +67,22 @@ export class DesktopBridgeError extends Error {
  * One shell-reported update state. absent fields are null in the wire JSON;
  * providers map this onto their own UpdateState vocabulary.
  */
+/** The shell settings document. */
+export interface DesktopSettings {
+  /** Whether closing the main window hides it instead of quitting. */
+  closeToTray: boolean
+  /** Whether the shell starts at login (Windows Run key). */
+  launchAtLogin: boolean
+}
+
+/** One registered shell window. */
+export interface DesktopWindowInfo {
+  /** Shell-owned window label: "main" or "win-<n>". */
+  label: string
+  /** Session the shell routed the window to, or null when none. */
+  sessionId: string | null
+}
+
 export interface DesktopUpdateState {
   channel: string
   currentVersion: string | null
@@ -141,9 +157,59 @@ export class DesktopBridge {
   }
 
   /**
-   * Fetch the shell's update state.
-   * @returns the wire state.
+   * Open one new shell window, optionally targeting a session.
+   * @param sessionId - optional session the window loads.
+   * @returns the new window's label.
    */
+  async openWindow(sessionId?: string): Promise<string> {
+    const payload: { sessionId?: string } = {}
+    if (sessionId !== undefined) payload.sessionId = sessionId
+    const answer = await this.request('POST', '/api/desktop/windows/open', payload) as { label: string }
+    return answer.label
+  }
+
+  /**
+   * Close one shell window; the main window hides instead.
+   * @param label - window label.
+   */
+  async closeWindow(label: string): Promise<void> {
+    await this.request('POST', '/api/desktop/windows/close', { label })
+  }
+
+  /**
+   * Show and focus one shell window.
+   * @param label - window label.
+   */
+  async focusWindow(label: string): Promise<void> {
+    await this.request('POST', '/api/desktop/windows/focus', { label })
+  }
+
+  /**
+   * List the shell's registered windows.
+   * @returns one entry per window.
+   */
+  async listWindows(): Promise<DesktopWindowInfo[]> {
+    const answer = await this.request('GET', '/api/desktop/windows') as { windows: DesktopWindowInfo[] }
+    return answer.windows
+  }
+
+  /**
+   * Fetch the shell settings document.
+   * @returns the close-to-tray and launch-at-login flags.
+   */
+  async getSettings(): Promise<DesktopSettings> {
+    return await this.request('GET', '/api/desktop/settings') as DesktopSettings
+  }
+
+  /**
+   * Apply a partial settings document; omitted fields keep their values.
+   * @param partial - close-to-tray and/or launch-at-login.
+   * @returns the complete updated document.
+   */
+  async setSettings(partial: Partial<DesktopSettings>): Promise<DesktopSettings> {
+    return await this.request('POST', '/api/desktop/settings', partial) as DesktopSettings
+  }
+
   /**
    * Fetch the shell's update state.
    * @param signal - optional caller cancellation, combined with the request timeout.
@@ -153,10 +219,6 @@ export class DesktopBridge {
     return await this.request('GET', '/api/desktop/update', undefined, signal) as DesktopUpdateState
   }
 
-  /**
-   * Ask the shell to apply an offered update.
-   * @param version - the version to apply.
-   */
   /**
    * Ask the shell to apply an offered update.
    * @param version - the version to apply.
