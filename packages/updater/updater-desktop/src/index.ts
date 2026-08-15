@@ -2,8 +2,9 @@
  * Desktop provider for the update seam: state() returns the last known
  * snapshot (a cached object replaced, never mutated, by each check),
  * check() fetches the shell's state, and apply() forwards to the shell,
- * which answers 501 until the release milestone implements it. Fails loud
- * at load when the bridge environment is missing.
+ * which runs the real Tauri Updater (download, minisign verification,
+ * install, restart). Fails loud at load when the bridge environment is
+ * missing.
  * @module @deepseek-ai/dsh-updater-desktop
  */
 
@@ -81,7 +82,8 @@ export default class DesktopUpdater extends UpdateService {
   }
 
   /**
-   * Forward an apply request to the shell; the skeleton answers 501.
+   * Forward an apply request to the shell; the shell downloads, verifies the
+   * minisign signature, installs, and restarts.
    * @param version - the version to apply.
    * @param signal - optional cancellation of the request.
    */

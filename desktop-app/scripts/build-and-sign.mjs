@@ -1,13 +1,22 @@
 // Builds the NSIS installer with updater signing, then assembles the update
-// manifest from the signed artifacts. The signing key comes from
-// TAURI_SIGNING_PRIVATE_KEY_PATH / TAURI_SIGNING_PRIVATE_KEY_PASSWORD
-// (defaulting to the local dev key); UPDATE_MANIFEST_BASE_URL overrides the
-// artifact URL (default: the shell bridge's self-hosting route);
-// UPDATE_VERSION_OVERRIDE writes a bumped manifest version for local
-// update-flow testing (the plugin only offers versions newer than the
-// running build).
+// manifest from the signed artifacts. The updater key comes from
+// TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD (defaulting
+// to the local dev key); UPDATE_MANIFEST_BASE_URL overrides the artifact URL
+// (default: the shell bridge's self-hosting route); UPDATE_VERSION_OVERRIDE
+// writes a bumped manifest version for local update-flow testing (the plugin
+// only offers versions newer than the running build).
+//
+// Authenticode: AUTHENTICODE_CERT (path to a .pfx) + AUTHENTICODE_PASSWORD
+// enable publisher signing through bundle.windows.signCommand - tauri signs
+// the NSIS installer with it BEFORE createUpdaterArtifacts computes the
+// minisign signature, so the .sig covers the signed installer. Without the
+// certificate the build still succeeds and the installer ships unsigned
+// (scripts/sign-windows.mjs owns the signtool invocation). The build always
+// overlays createUpdaterArtifacts: true - the committed config keeps it off
+// for plain tauri build runs.
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -31,7 +40,26 @@ if (env.TAURI_SIGNING_PRIVATE_KEY === undefined) {
 }
 if (env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD === undefined) env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD = 'dsh-dev-key'
 
-execFileSync('pnpm', ['tauri', 'build', '--bundles', 'nsis'], { cwd: root, env, stdio: 'inherit', shell: process.platform === 'win32' })
+const hasAuthenticode = env.AUTHENTICODE_CERT !== undefined && env.AUTHENTICODE_CERT !== ''
+  && env.AUTHENTICODE_PASSWORD !== undefined
+const overlay = { bundle: { createUpdaterArtifacts: true } }
+if (hasAuthenticode) {
+  const signer = join(root, 'scripts', 'sign-windows.mjs')
+  // tauri whitespace-splits the command and substitutes %1 with the file as
+  // one argv element, so spaces in the signed path cannot break it.
+  overlay.bundle.windows = { signCommand: 'node ' + signer + ' %1' }
+}
+const overlayDir = mkdtempSync(join(tmpdir(), 'dsh-sign-config-'))
+const overlayPath = join(overlayDir, 'config.json')
+writeFileSync(overlayPath, JSON.stringify(overlay))
+try {
+  execFileSync('pnpm', ['tauri', 'build', '--bundles', 'nsis', '--config', overlayPath], { cwd: root, env, stdio: 'inherit', shell: process.platform === 'win32' })
+} finally {
+  rmSync(overlayDir, { recursive: true, force: true })
+}
+console.log(hasAuthenticode
+  ? 'installer Authenticode-signed through bundle.windows.signCommand'
+  : 'no AUTHENTICODE_CERT; the installer ships without an Authenticode signature (updater artifacts remain minisign-signed)')
 
 const bundleDir = join(root, 'src-tauri', 'target', 'release', 'bundle', 'nsis')
 const setup = readdirSync(bundleDir).find(name => name.endsWith('-setup.exe'))

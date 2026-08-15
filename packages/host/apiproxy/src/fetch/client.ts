@@ -16,7 +16,9 @@ import { hostFrameSchema, muxFrameSchema } from '../api/events.schema.ts'
 import {
   hostCreateDirectoryValueSchema, hostDescribeValueSchema,
   hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
+  hostReportWindowValueSchema,
 } from '../api/host.schema.ts'
+import { desktopGetSettingsValueSchema, desktopSetSettingsValueSchema } from '../api/desktop.schema.ts'
 import {
   sessionCancelValueSchema,
   sessionAttachmentValueSchema,
@@ -111,6 +113,11 @@ export interface IApiClient {
     listDirectory(payload: RequestPayload<'host.listDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.listDirectory'>>>
     createDirectory(payload: RequestPayload<'host.createDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.createDirectory'>>>
     openPath(payload: RequestPayload<'host.openPath'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.openPath'>>>
+    reportWindow(payload: RequestPayload<'host.reportWindow'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.reportWindow'>>>
+  }
+  desktop: {
+    getSettings(payload: RequestPayload<'desktop.getSettings'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'desktop.getSettings'>>>
+    setSettings(payload: RequestPayload<'desktop.setSettings'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'desktop.setSettings'>>>
   }
   workspace: {
     list(payload: RequestPayload<'workspace.list'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'workspace.list'>>>
@@ -191,6 +198,9 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'host.listDirectory': hostListDirectoryValueSchema,
   'host.createDirectory': hostCreateDirectoryValueSchema,
   'host.openPath': hostOpenPathValueSchema,
+  'host.reportWindow': hostReportWindowValueSchema,
+  'desktop.getSettings': desktopGetSettingsValueSchema,
+  'desktop.setSettings': desktopSetSettingsValueSchema,
   'workspace.list': workspaceListValueSchema,
   'workspace.create': workspaceCreateValueSchema,
   'workspace.rename': workspaceRenameValueSchema,
@@ -441,6 +451,12 @@ export abstract class AbstractApiClient implements IApiClient {
     listDirectory: (payload, signal) => this.callUnary('host.listDirectory', payload, signal),
     createDirectory: (payload, signal) => this.callUnary('host.createDirectory', payload, signal),
     openPath: (payload, signal) => this.callUnary('host.openPath', payload, signal),
+    reportWindow: (payload, signal) => this.callUnary('host.reportWindow', payload, signal),
+  }
+
+  readonly desktop: IApiClient['desktop'] = {
+    getSettings: (payload, signal) => this.callUnary('desktop.getSettings', payload, signal),
+    setSettings: (payload, signal) => this.callUnary('desktop.setSettings', payload, signal),
   }
 
   readonly workspace: IApiClient['workspace'] = {

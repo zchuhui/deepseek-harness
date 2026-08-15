@@ -24,4 +24,4 @@ Status: implemented
 - 本机已验证:修复后桥监听器空闲 8 秒仍存活,对无 token 请求应答 401,请求之后继续监听。
 - 里程碑 2 的桥从未服务过晚于首个空闲超时的请求;此前能工作的桌面 provider 消费者都只是落在那个窗口内。
 
-相关:[协议深链、单实例与 toast 激活](2026-08-15-desktop-protocol-single-instance-toast-activation.md)。
+相关:[协议深链、单实例与 toast 激活](../feature/2026-08-15-desktop-protocol-single-instance-toast-activation.md)。

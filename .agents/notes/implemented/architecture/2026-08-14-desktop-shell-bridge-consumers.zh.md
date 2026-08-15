@@ -27,4 +27,4 @@ Status: implemented
 - Tauri 壳保持原语 provider 的角色:接缝语义(类别、渠道、遮蔽)留在宿主侧,换壳重写也不受影响。
 - 壳只向自己拉起的子进程导出桥接事实;复用已在运行的服务(无桥接环境)时,桌面 provider 在加载期大声失败——已记录,不静默。
 - 更新端点是真实的:壳运行 tauri-plugin-updater 检查配置的端点,/api/desktop/update 以缓存的线上状态应答,/api/desktop/update/apply 执行下载-校验-安装-重启,并在桥接上为本地闭环自托管 update-manifest.json 与已签名安装件。签名是 minisign 链(私钥留在构建机,公钥内嵌于 tauri.conf.json);Authenticode 发布方签名仍归发布负责人。
-- 通知深链走同一桥接:toast 载荷携带可选 `sessionId`,壳把最新一条存为待跳转深链,托盘项「打开最新通知」唤起、聚焦主窗口并导航到 `http://127.0.0.1:<port>/?session=<id>`——web 客户端在启动时解析的 URL 协议。OS 级 toast 点击激活等待安装器里程碑的 AppUserModelID 快捷方式。
+- 通知深链走同一桥接:toast 载荷携带可选 `sessionId`,壳把最新一条存为待跳转深链,托盘项「打开最新通知」唤起、聚焦主窗口并导航到 `http://127.0.0.1:<port>/?session=<id>`——web 客户端在启动时解析的 URL 协议。OS 级 toast 点击激活在 Windows 上经 `dsh` 协议可用,toast 身份是壳自身的 AUMID(每次启动注册的开始菜单快捷方式);macOS/Linux 仍缺激活回调。

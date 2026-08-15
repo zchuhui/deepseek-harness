@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-15-desktop-protocol-single-instance-toast-activation.md
-2026-08-15-desktop-protocol-single-instance-toast-activation.md: db8f381aad4ff75aced9aca2d0866fa577c64873
-2026-08-15-desktop-protocol-single-instance-toast-activation.zh.md: d48e0ea36aecb9bcb08092b4672e70a492661e06
+2026-08-15-desktop-protocol-single-instance-toast-activation.md: 91c7af1ae0da5f42e19d0a642bcb577ed0f10ceb
+2026-08-15-desktop-protocol-single-instance-toast-activation.zh.md: c503a64382a22fe4a5be091ff069d1441b5bc169

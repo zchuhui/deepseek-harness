@@ -83,6 +83,12 @@ export class FakeApiClient implements IApiClient {
     () => Promise.resolve(ok({ path: null }))
   onOpenPath: (payload: unknown) => Promise<RpcResponse<{ opened: true }>> =
     () => Promise.resolve(ok({ opened: true as const }))
+  onReportWindow: (payload: unknown) => Promise<RpcResponse<{ reported: true }>> =
+    () => Promise.resolve(ok({ reported: true as const }))
+  onGetSettings: (payload: unknown) => Promise<RpcResponse<{ closeToTray: boolean; launchAtLogin: boolean }>> =
+    () => Promise.resolve(ok({ closeToTray: false, launchAtLogin: false }))
+  onSetSettings: (payload: unknown) => Promise<RpcResponse<{ closeToTray: boolean; launchAtLogin: boolean }>> =
+    () => Promise.resolve(ok({ closeToTray: false, launchAtLogin: false }))
 
   onListDirectory: (payload: unknown) => Promise<RpcResponse<{
     path: string
@@ -146,6 +152,12 @@ export class FakeApiClient implements IApiClient {
     listDirectory: payload => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
     createDirectory: payload => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: payload => this.record('host.openPath', payload, this.onOpenPath(payload)),
+    reportWindow: payload => this.record('host.reportWindow', payload, this.onReportWindow(payload)),
+  }
+
+  readonly desktop: IApiClient['desktop'] = {
+    getSettings: payload => this.record('desktop.getSettings', payload, this.onGetSettings(payload)),
+    setSettings: payload => this.record('desktop.setSettings', payload, this.onSetSettings(payload)),
   }
 
   readonly workspace: IApiClient['workspace'] = {

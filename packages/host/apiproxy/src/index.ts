@@ -15,6 +15,8 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
+// Type-only: resolves `ctx.get('desktopHost')` to the optional desktop shell service.
+import type {} from '@deepseek-ai/dsh-host-desktop'
 import type { ApiProxy } from './api/index.ts'
 import { createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES } from './api-proxy.ts'
 import {
@@ -83,6 +85,7 @@ export class ApiProxyService extends Service implements ApiProxy {
   readonly subagents: ApiProxy['subagents']
   readonly workspace: ApiProxy['workspace']
   readonly host: ApiProxy['host']
+  readonly desktop: ApiProxy['desktop']
   readonly goals: ApiProxy['goals']
   readonly skills: ApiProxy['skills']
   readonly agentPresets: ApiProxy['agentPresets']
@@ -95,6 +98,7 @@ export class ApiProxyService extends Service implements ApiProxy {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'apiProxy')
+    const desktop = ctx.get('desktopHost') as Context['desktopHost'] | undefined
     const api = createApiProxy(ctx, {
       defaultModelSelection: () => ctx.agentDefaultModel.currentSelection(),
       saveDefaultModelSelection: selection => ctx.agentDefaultModel.saveSelection(selection),
@@ -106,11 +110,21 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.coldBlankProbeMaxBytes === undefined
         ? {}
         : { coldBlankProbeMaxBytes: config.coldBlankProbeMaxBytes }),
+      ...desktop === undefined
+        ? {}
+        : {
+          reportWindow: (label: string, sessionId: string | null) => desktop.reportWindow(label, sessionId),
+          desktopSettings: {
+            get: () => desktop.getSettings(),
+            set: partial => desktop.setSettings(partial),
+          },
+        },
     })
     this.sessions = api.sessions
     this.subagents = api.subagents
     this.workspace = api.workspace
     this.host = api.host
+    this.desktop = api.desktop
     this.goals = api.goals
     this.skills = api.skills
     this.agentPresets = api.agentPresets

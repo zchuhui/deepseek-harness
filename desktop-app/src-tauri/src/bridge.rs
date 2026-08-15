@@ -139,6 +139,7 @@ fn route(app: &AppHandle, mut request: tiny_http::Request) -> Result<(), ()> {
         (Method::Post, "/api/desktop/windows/open") => windows_open(app, &body),
         (Method::Post, "/api/desktop/windows/close") => windows_close(app, &body),
         (Method::Post, "/api/desktop/windows/focus") => windows_focus(app, &body),
+        (Method::Post, "/api/desktop/windows/assign") => windows_assign(app, &body),
         (Method::Get, "/api/desktop/windows") => windows_list(app),
         (Method::Get, "/api/desktop/settings") => settings_get(app),
         (Method::Post, "/api/desktop/settings") => settings_set(app, &body),
@@ -198,12 +199,11 @@ fn toast(app: &AppHandle, body: &str) -> Response<std::io::Cursor<Vec<u8>>> {
     #[cfg(windows)]
     {
         let launch_url = launch.map(|id| format!("dsh://session/{id}"));
-        return match crate::toast::show_toast(
-            title,
-            text,
-            launch_url.as_deref(),
-            crate::toast::DEFAULT_APP_ID,
-        ) {
+        let app_id = app
+            .try_state::<crate::toast::ToastAppId>()
+            .map(|state| state.0.clone())
+            .unwrap_or_else(|| crate::toast::POWERSHELL_APP_ID.to_string());
+        return match crate::toast::show_toast(title, text, launch_url.as_deref(), &app_id) {
             Ok(()) => json_response(200, serde_json::json!({ "shown": true })),
             Err(error) => json_response(
                 500,
@@ -318,6 +318,45 @@ fn windows_focus(app: &AppHandle, body: &str) -> Response<std::io::Cursor<Vec<u8
     } else {
         json_response(404, serde_json::json!({ "error": "window not found" }))
     }
+}
+
+/**
+ * POST /api/desktop/windows/assign: record the session one window now shows.
+ * This is the client-reported half of the window registry — the shell knows
+ * its own routed targets, and the web client reports sessions the operator
+ * opens through the sidebar, so a deep link focuses the owning window
+ * instead of opening a new one. Only registered labels are accepted.
+ */
+fn windows_assign(app: &AppHandle, body: &str) -> Response<std::io::Cursor<Vec<u8>>> {
+    let payload: Result<serde_json::Value, _> = serde_json::from_str(body);
+    let Ok(payload) = payload else {
+        return json_response(400, serde_json::json!({ "error": "invalid JSON body" }));
+    };
+    let Some(label) = payload.get("label").and_then(|v| v.as_str()) else {
+        return json_response(400, serde_json::json!({ "error": "label is required" }));
+    };
+    if !app.state::<crate::windows::WindowRegistry>().exists(label) {
+        return json_response(404, serde_json::json!({ "error": "window not found" }));
+    }
+    let session_id = match payload.get("sessionId") {
+        None => return json_response(400, serde_json::json!({ "error": "sessionId is required" })),
+        Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(id)) => {
+            if !crate::deeplink::is_safe_session_id(id) {
+                return json_response(400, serde_json::json!({ "error": "unsafe session id" }));
+            }
+            Some(id.clone())
+        }
+        Some(_) => {
+            return json_response(
+                400,
+                serde_json::json!({ "error": "sessionId must be a string or null" }),
+            )
+        }
+    };
+    app.state::<crate::windows::WindowRegistry>()
+        .assign(label, session_id);
+    json_response(200, serde_json::json!({ "assigned": true }))
 }
 
 /** GET /api/desktop/windows: list the registered windows and their sessions. */

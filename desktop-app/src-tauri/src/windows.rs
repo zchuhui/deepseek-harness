@@ -36,6 +36,17 @@ impl WindowRegistry {
         }
     }
 
+    /** Whether the registry knows one window label.
+     * @param label - label to look up.
+     * @returns true when a window with this label is registered.
+     */
+    pub fn exists(&self, label: &str) -> bool {
+        self.map
+            .lock()
+            .expect("window registry lock held")
+            .contains_key(label)
+    }
+
     /**
      * The window label that owns one session, or None.
      * @param session_id - session to look up.
@@ -234,5 +245,14 @@ mod tests {
         let registry = WindowRegistry::new();
         let snapshot = registry.snapshot();
         assert_eq!(vec![(MAIN_LABEL.to_string(), None)], snapshot);
+    }
+
+    #[test]
+    fn registry_reports_window_membership() {
+        let registry = WindowRegistry::new();
+        assert!(registry.exists(MAIN_LABEL));
+        assert!(!registry.exists("win-0"));
+        registry.assign("win-0", None);
+        assert!(registry.exists("win-0"));
     }
 }

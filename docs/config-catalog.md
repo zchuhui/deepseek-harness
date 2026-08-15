@@ -547,6 +547,24 @@ export interface Config {
 
 Source: [`packages/extensions/cordis-host-runner/src/index.ts:88`](../packages/extensions/cordis-host-runner/src/index.ts)
 
+<a id="deepseek-aidsh-credentials-desktop"></a>
+
+## `@deepseek-ai/dsh-credentials-desktop`
+
+```ts config-catalog
+/** Plugin config: bridge connection overrides and timeout. */
+export interface Config {
+  /** Bridge URL override; defaults to the shell-exported environment. */
+  bridgeUrl?: string
+  /** Bridge token override; defaults to the shell-exported environment. */
+  bridgeToken?: string
+  /** Per-request timeout in milliseconds; defaults to 5000. */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/credentials/credentials-desktop/src/index.ts:17`](../packages/credentials/credentials-desktop/src/index.ts)
+
 <a id="deepseek-aidsh-credentials-local"></a>
 
 ## `@deepseek-ai/dsh-credentials-local`
@@ -753,7 +771,25 @@ export interface Config {
 }
 ```
 
-Source: [`packages/host/apiproxy/src/index.ts:41`](../packages/host/apiproxy/src/index.ts)
+Source: [`packages/host/apiproxy/src/index.ts:43`](../packages/host/apiproxy/src/index.ts)
+
+<a id="deepseek-aidsh-host-desktop-shell"></a>
+
+## `@deepseek-ai/dsh-host-desktop-shell`
+
+```ts config-catalog
+/** Plugin config: bridge connection overrides and timeout. */
+export interface Config {
+  /** Bridge URL override; defaults to the shell-exported environment. */
+  bridgeUrl?: string
+  /** Bridge token override; defaults to the shell-exported environment. */
+  bridgeToken?: string
+  /** Per-request timeout in milliseconds; defaults to 5000. */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/host/desktop-shell/src/index.ts:15`](../packages/host/desktop-shell/src/index.ts)
 
 <a id="deepseek-aidsh-host-directory-picker-browse"></a>
 
@@ -1292,6 +1328,62 @@ export interface Config {
 ```
 
 Source: [`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
+
+<a id="deepseek-aidsh-notifications-desktop"></a>
+
+## `@deepseek-ai/dsh-notifications-desktop`
+
+```ts config-catalog
+/** Plugin config: bridge connection overrides and timeout. */
+export interface Config {
+  /** Bridge URL override; defaults to the shell-exported environment. */
+  bridgeUrl?: string
+  /** Bridge token override; defaults to the shell-exported environment. */
+  bridgeToken?: string
+  /** Per-request timeout in milliseconds; defaults to 5000. */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/notify/notifications-desktop/src/index.ts:15`](../packages/notify/notifications-desktop/src/index.ts)
+
+<a id="deepseek-aidsh-notifications-windows"></a>
+
+## `@deepseek-ai/dsh-notifications-windows`
+
+```ts config-catalog
+/** Plugin config: toast identity and launcher executable. */
+export interface Config {
+  /** AppUserModelID toasts show under; defaults to Windows PowerShell's own. */
+  appId?: string
+  /** PowerShell executable name; defaults to 'powershell.exe'. */
+  powershell?: string
+}
+```
+
+Source: [`packages/notify/notifications-windows/src/index.ts:18`](../packages/notify/notifications-windows/src/index.ts)
+
+<a id="deepseek-aidsh-notify-events"></a>
+
+## `@deepseek-ai/dsh-notify-events`
+
+Requires: `notifications` · `jobs`
+
+```ts config-catalog
+/** Bridge policy: which event classes raise, decided at composition. */
+export interface Config {
+  /** Raise on every terminal background job; defaults to true. */
+  jobSettled?: boolean
+  /** Raise when an approval is waiting; defaults to true. */
+  approvalWaiting?: boolean
+  /** Raise when a turn dies with an error; defaults to true. */
+  turnFailed?: boolean
+  /** Raise on a failed tool call; defaults to false — tool failures are recoverable and frequent. */
+  toolFailed?: boolean
+}
+```
+
+Source: [`packages/notify/notify-events/src/index.ts:31`](../packages/notify/notify-events/src/index.ts)
 
 <a id="deepseek-aidsh-permission-presets"></a>
 
@@ -2812,6 +2904,42 @@ export interface Config {
 
 Source: [`packages/typert/loader/src/index.ts:47`](../packages/typert/loader/src/index.ts)
 
+<a id="deepseek-aidsh-updater-desktop"></a>
+
+## `@deepseek-ai/dsh-updater-desktop`
+
+```ts config-catalog
+/** Plugin config: bridge connection overrides, timeout, and the initial reported channel. */
+export interface Config {
+  /** Bridge URL override; defaults to the shell-exported environment. */
+  bridgeUrl?: string
+  /** Bridge token override; defaults to the shell-exported environment. */
+  bridgeToken?: string
+  /** Per-request timeout in milliseconds; defaults to 5000. */
+  timeoutMs?: number
+  /** Channel reported before the first check; defaults to 'manual'. */
+  channel?: string
+}
+```
+
+Source: [`packages/updater/updater-desktop/src/index.ts:16`](../packages/updater/updater-desktop/src/index.ts)
+
+<a id="deepseek-aidsh-updater-manual"></a>
+
+## `@deepseek-ai/dsh-updater-manual`
+
+```ts config-catalog
+/** Plugin config: the channel and installed version the provider reports. */
+export interface Config {
+  /** Update channel name; defaults to `manual`. */
+  channel?: string
+  /** Currently installed version to report; defaults to null (not installed). */
+  currentVersion?: string
+}
+```
+
+Source: [`packages/updater/updater-manual/src/index.ts:16`](../packages/updater/updater-manual/src/index.ts)
+
 <a id="deepseek-aidsh-user-approval"></a>
 
 ## `@deepseek-ai/dsh-user-approval`
@@ -3047,6 +3175,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-permission-presets` ([`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-settings-desktop` ([`packages/client/ui-settings-desktop/src/index.ts`](../packages/client/ui-settings-desktop/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
@@ -3073,6 +3202,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-host-plugin-inventory` — requires `loader` ([`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-llm` ([`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts))
 - `@deepseek-ai/dsh-lsp` ([`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts))
+- `@deepseek-ai/dsh-notifications-terminal` ([`packages/notify/notifications-terminal/src/index.ts`](../packages/notify/notifications-terminal/src/index.ts))
 - `@deepseek-ai/dsh-schedule` — requires `agents` · `sessions` · `tools` · `sessionPersistence` ([`packages/schedule/schedule/src/index.ts`](../packages/schedule/schedule/src/index.ts))
 - `@deepseek-ai/dsh-session` ([`packages/core/session/src/index.ts`](../packages/core/session/src/index.ts))
 - `@deepseek-ai/dsh-session-checkpoint-policy` — requires `llm` · `sessionPersistence` · `sessions` · `tools` ([`packages/session/session-checkpoint-policy/src/index.ts`](../packages/session/session-checkpoint-policy/src/index.ts))
@@ -3100,8 +3230,10 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@deepseek-ai/dsh-compaction` — abstract `CompactionEngine` ([`packages/compaction/compaction/src/index.ts`](../packages/compaction/compaction/src/index.ts))
 - `@deepseek-ai/dsh-credentials` — abstract `CredentialProvider` ([`packages/credentials/credentials/src/index.ts`](../packages/credentials/credentials/src/index.ts))
 - `@deepseek-ai/dsh-fs` — abstract `FileSystem` ([`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts))
+- `@deepseek-ai/dsh-host-desktop` — abstract `DesktopHost` ([`packages/host/desktop/src/index.ts`](../packages/host/desktop/src/index.ts))
 - `@deepseek-ai/dsh-host-directory-picker` — abstract `DirectoryPicker` ([`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts))
 - `@deepseek-ai/dsh-jobs` — abstract `JobRegistry` ([`packages/jobs/jobs/src/index.ts`](../packages/jobs/jobs/src/index.ts))
+- `@deepseek-ai/dsh-notifications` — abstract `NotificationService` ([`packages/notify/notifications/src/index.ts`](../packages/notify/notifications/src/index.ts))
 - `@deepseek-ai/dsh-sandbox` — abstract `SandboxProvider` ([`packages/sandbox/sandbox/src/index.ts`](../packages/sandbox/sandbox/src/index.ts))
 - `@deepseek-ai/dsh-session-persistence` — abstract `SessionPersistence` ([`packages/session/session-persistence/src/index.ts`](../packages/session/session-persistence/src/index.ts))
 - `@deepseek-ai/dsh-session-query` — abstract `SessionQueryEngine` ([`packages/session-query/session-query/src/index.ts`](../packages/session-query/session-query/src/index.ts))
@@ -3109,6 +3241,7 @@ Abstract service classes — a deployment loads a concrete implementation packag
 - `@deepseek-ai/dsh-shell` — abstract `ShellExecutor` ([`packages/shell/shell/src/index.ts`](../packages/shell/shell/src/index.ts))
 - `@deepseek-ai/dsh-spill` — abstract `SpillStore` ([`packages/spill/spill/src/index.ts`](../packages/spill/spill/src/index.ts))
 - `@deepseek-ai/dsh-subprocess` — abstract `SubprocessRuntime` ([`packages/subprocess/subprocess/src/index.ts`](../packages/subprocess/subprocess/src/index.ts))
+- `@deepseek-ai/dsh-updater` — abstract `UpdateService` ([`packages/updater/updater/src/index.ts`](../packages/updater/updater/src/index.ts))
 - `@deepseek-ai/dsh-workflow` — abstract `WorkflowEngine` ([`packages/workflow/workflow/src/index.ts`](../packages/workflow/workflow/src/index.ts))
 
 ## Library packages (no plugin entry)
@@ -3130,6 +3263,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-client-web` ([`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts))
 - `@deepseek-ai/dsh-client-web-react` ([`packages/client/web-react/src/index.ts`](../packages/client/web-react/src/index.ts))
 - `@deepseek-ai/dsh-cmdline` ([`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts))
+- `@deepseek-ai/dsh-desktop-bridge` ([`packages/util/desktop-bridge/src/index.ts`](../packages/util/desktop-bridge/src/index.ts))
 - `@deepseek-ai/dsh-home-paths` ([`packages/util/home-paths/src/index.ts`](../packages/util/home-paths/src/index.ts))
 - `@deepseek-ai/dsh-hook-protocol` ([`packages/hooks/hook-protocol/src/index.ts`](../packages/hooks/hook-protocol/src/index.ts))
 - `@deepseek-ai/dsh-launch-environment` ([`packages/util/launch-environment/src/index.ts`](../packages/util/launch-environment/src/index.ts))

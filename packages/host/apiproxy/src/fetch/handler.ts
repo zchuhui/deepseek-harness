@@ -32,8 +32,11 @@ import {
 import {
   hostCreateDirectoryRequestSchema, hostDescribeRequestSchema,
   hostListDirectoryRequestSchema, hostOpenPathRequestSchema,
-  hostPickDirectoryRequestSchema,
+  hostPickDirectoryRequestSchema, hostReportWindowRequestSchema,
 } from '../api/host.schema.ts'
+import {
+  desktopGetSettingsRequestSchema, desktopSetSettingsRequestSchema,
+} from '../api/desktop.schema.ts'
 import {
   workspaceArchiveSessionRequestSchema,
   workspaceCreateRequestSchema,
@@ -109,6 +112,9 @@ const UNARY_ROUTES: UnaryRoutes = {
   'host.listDirectory': { schema: hostListDirectoryRequestSchema, invoke: (api, r, signal) => api.host.listDirectory(r, signal) },
   'host.createDirectory': { schema: hostCreateDirectoryRequestSchema, invoke: (api, r) => api.host.createDirectory(r) },
   'host.openPath': { schema: hostOpenPathRequestSchema, invoke: (api, r, signal) => api.host.openPath(r, signal) },
+  'host.reportWindow': { schema: hostReportWindowRequestSchema, invoke: (api, r) => api.host.reportWindow(r) },
+  'desktop.getSettings': { schema: desktopGetSettingsRequestSchema, invoke: (api, r) => api.desktop.getSettings(r) },
+  'desktop.setSettings': { schema: desktopSetSettingsRequestSchema, invoke: (api, r) => api.desktop.setSettings(r) },
   'workspace.list': { schema: workspaceListRequestSchema, invoke: (api, r) => api.workspace.list(r) },
   'workspace.create': { schema: workspaceCreateRequestSchema, invoke: (api, r) => api.workspace.create(r) },
   'workspace.rename': { schema: workspaceRenameRequestSchema, invoke: (api, r) => api.workspace.rename(r) },
@@ -174,7 +180,6 @@ function fullResponse(narrow: RpcResponse<unknown>): Response {
  */
 // K appears once in the signature but ties the UNARY_ROUTES[K] row lookup to its own
 // schema/invoke pairing; a union parameter degrades the row to an uninvokable intersection.
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
 async function handleUnary<K extends keyof RpcMethodMap>(
   api: ApiProxy, method: K, message: ClientRequest, signal: AbortSignal,
 ): Promise<Response> {

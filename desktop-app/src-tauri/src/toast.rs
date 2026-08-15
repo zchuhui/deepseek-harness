@@ -12,9 +12,14 @@ use std::process::Command;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
 
-/** Default AppUserModelID: Windows PowerShell's own, so toasts need no installed app identity. */
-pub const DEFAULT_APP_ID: &str =
+/** Fallback AppUserModelID: Windows PowerShell's own, so toasts still show when the shell identity is not registered. */
+pub const POWERSHELL_APP_ID: &str =
     "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe";
+
+/** The AppUserModelID the shell shows toasts under, chosen at boot: the
+ * shell's own identity once the Start Menu shortcut registers it, Windows
+ * PowerShell's otherwise. */
+pub struct ToastAppId(pub String);
 
 /**
  * Escape one value for XML text content: the four markup-significant
@@ -155,7 +160,7 @@ mod tests {
     #[test]
     fn xml_escapes_operator_text_inside_script_literal() {
         let xml = build_toast_xml("a & b <c> 'd'", "正文", None);
-        let script = build_toast_script(&xml, DEFAULT_APP_ID);
+        let script = build_toast_script(&xml, POWERSHELL_APP_ID);
         assert!(script.contains("&amp;"));
         assert!(script.contains("&lt;c&gt;"));
         assert!(script.contains("''d''"));
@@ -166,7 +171,7 @@ mod tests {
     fn encoded_command_decodes_back_to_the_script() {
         let script = build_toast_script(
             &build_toast_xml("t", "b", Some("dsh://session/sess-9")),
-            DEFAULT_APP_ID,
+            POWERSHELL_APP_ID,
         );
         let decoded_bytes = BASE64.decode(encode_powershell_command(&script)).unwrap();
         let units: Vec<u16> = decoded_bytes

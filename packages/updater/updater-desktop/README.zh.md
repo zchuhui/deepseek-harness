@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-[更新接缝](../updater/README.md)的桌面 provider:`state()` 返回最近一次已知快照(缓存对象由每次 `check()` 整体替换、从不就地修改),`check()` 拉取壳的线上状态,`apply()` 转发给壳——在发布里程碑实现真实下载之前,壳应答 501。桥接环境(`DSH_DESKTOP_BRIDGE_URL`/`DSH_DESKTOP_BRIDGE_TOKEN`)缺失时在加载期大声失败;壳报告的渠道经 `updateChannel` 品牌化,非法渠道同样大声失败。
+[更新接缝](../updater/README.md)的桌面 provider:`state()` 返回最近一次已知快照(缓存对象由每次 `check()` 整体替换、从不就地修改),`check()` 拉取壳的线上状态,`apply()` 转发给壳——壳运行真实 Tauri Updater,下载、校验 minisign 签名、安装并重启。桥接环境(`DSH_DESKTOP_BRIDGE_URL`/`DSH_DESKTOP_BRIDGE_TOKEN`)缺失时在加载期大声失败;壳报告的渠道经 `updateChannel` 品牌化,非法渠道同样大声失败。
 
 ## 配置
 
@@ -23,5 +23,5 @@
 
 ## 已知限制与待办
 
-- **无下载与安装** —— 壳骨架对 `apply` 应答 501;真实 Tauri Updater 接线属于发布里程碑。
+- **依赖生产托管** —— 壳对配置的端点做检查与下载;本地闭环自托管在壳的桥接上,生产部署必须把更新清单与签名安装件托管到 HTTPS 并轮换签名密钥(发布动作,非代码缺口)。
 - **仅轮询可得** —— `state()` 读缓存;新鲜度依赖调用方触发 `check()`。

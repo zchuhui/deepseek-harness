@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deepLinkSessionId } from '../src/client/workspaces/deep-link.ts'
+import { deepLinkSessionId, windowLabel } from '../src/client/workspaces/deep-link.ts'
 
 describe('deepLinkSessionId', () => {
   it('returns the session value when present and non-empty', () => {
@@ -27,5 +27,28 @@ describe('deepLinkSessionId', () => {
   it('keeps standard URLSearchParams semantics for repeated and encoded values', () => {
     expect(deepLinkSessionId('?session=abc&session=def')).toBe('abc')
     expect(deepLinkSessionId('?session=%61bc')).toBe('abc')
+  })
+})
+
+describe('windowLabel', () => {
+  it('returns the win value when present and non-empty', () => {
+    expect(windowLabel('?win=main')).toBe('main')
+    expect(windowLabel('?win=win-0')).toBe('win-0')
+  })
+
+  it('returns undefined when the win parameter is absent or empty', () => {
+    expect(windowLabel('?')).toBeUndefined()
+    expect(windowLabel('?foo=bar')).toBeUndefined()
+    expect(windowLabel('?win=')).toBeUndefined()
+  })
+
+  it('extracts win among other parameters', () => {
+    expect(windowLabel('?session=abc&win=main')).toBe('main')
+    expect(windowLabel('?win=win-1&foo=2')).toBe('win-1')
+  })
+
+  it('returns undefined when the input has no leading question mark', () => {
+    expect(windowLabel('')).toBeUndefined()
+    expect(windowLabel('win=main')).toBeUndefined()
   })
 })

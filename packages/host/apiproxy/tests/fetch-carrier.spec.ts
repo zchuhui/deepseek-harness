@@ -159,6 +159,17 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
       async openPath(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { opened: true as const } } }
       },
+      async reportWindow(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { reported: true as const } } }
+      },
+    },
+    desktop: {
+      async getSettings(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { closeToTray: false, launchAtLogin: false } } }
+      },
+      async setSettings(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { closeToTray: false, launchAtLogin: false } } }
+      },
     },
     workspace: {
       async list(request) {

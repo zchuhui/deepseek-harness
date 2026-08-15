@@ -667,6 +667,28 @@ export interface ApiProxyDefaults {
    * falls back to platform detection ({@link canOpenNativePath}).
    */
   canOpenPath?: () => boolean
+  /**
+   * Report which session one shell window shows to the desktop shell bridge;
+   * absent in a plain `dsh web` deployment (no desktop host service).
+   * @param label - the shell window label ("main" or "win-<n>").
+   * @param sessionId - the session the window shows, or null for none.
+   * @returns resolves once the shell has recorded the report.
+   */
+  reportWindow?: (label: string, sessionId: string | null) => Promise<void>
+  /** Desktop shell settings read/write; absent in a plain `dsh web` deployment. */
+  desktopSettings?: {
+    /**
+     * Read the complete settings document.
+     * @returns the close-to-tray and launch-at-login flags.
+     */
+    get(): Promise<{ closeToTray: boolean; launchAtLogin: boolean }>
+    /**
+     * Apply a partial settings document; omitted fields keep their values.
+     * @param partial - close-to-tray and/or launch-at-login.
+     * @returns the complete updated document.
+     */
+    set(partial: { closeToTray?: boolean; launchAtLogin?: boolean }): Promise<{ closeToTray: boolean; launchAtLogin: boolean }>
+  }
 }
 
 /** The tool/call payload fields the presenter path reads. */
@@ -1925,6 +1947,11 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @deepseek-ai/dsh-credentials-local) in its composition', details: {} }
   }
 
+  /** Missing-service report shared by the desktop domain and host.reportWindow. */
+  function desktopUnavailable(): RpcError {
+    return { code: 'desktop-unavailable', message: 'the desktop shell is unavailable: this deployment does not compose the desktop host service (@deepseek-ai/dsh-host-desktop)', details: {} }
+  }
+
   /** Map one redacted settings descriptor to its wire view. */
   function namespaceView(descriptor: SettingsDescriptor): SettingsNamespaceView {
     return {
@@ -3007,6 +3034,57 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async openPath(request, signal) {
         return openPath(request, request.payload.path, signal)
+      },
+
+      async reportWindow(request) {
+        const report = defaults.reportWindow
+        if (report === undefined) {
+          return err(request, desktopUnavailable())
+        }
+        try {
+          await report(request.payload.label, request.payload.sessionId)
+          return ok(request, { reported: true as const })
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'internal',
+            message: `window report failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
+      },
+    },
+
+    desktop: {
+      async getSettings(request) {
+        const settings = defaults.desktopSettings
+        if (settings === undefined) {
+          return err(request, desktopUnavailable())
+        }
+        try {
+          return ok(request, await settings.get())
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'internal',
+            message: `desktop settings read failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
+      },
+
+      async setSettings(request) {
+        const settings = defaults.desktopSettings
+        if (settings === undefined) {
+          return err(request, desktopUnavailable())
+        }
+        try {
+          return ok(request, await settings.set(request.payload))
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'internal',
+            message: `desktop settings write failed: ${error instanceof Error ? error.message : String(error)}`,
+            details: {},
+          })
+        }
       },
     },
 

@@ -64,6 +64,11 @@ async function harness(
   extras: {
     openPath?: (path: string, signal: AbortSignal) => Promise<void>
     canOpenPath?: () => boolean
+    reportWindow?: (label: string, sessionId: string | null) => Promise<void>
+    desktopSettings?: {
+      get(): Promise<{ closeToTray: boolean; launchAtLogin: boolean }>
+      set(partial: { closeToTray?: boolean; launchAtLogin?: boolean }): Promise<{ closeToTray: boolean; launchAtLogin: boolean }>
+    }
   } = {},
 ) {
   const ctx = new Context()
@@ -107,6 +112,8 @@ async function harness(
     cwd: root,
     ...extras.openPath === undefined ? {} : { openPath: extras.openPath },
     ...extras.canOpenPath === undefined ? {} : { canOpenPath: extras.canOpenPath },
+    ...extras.reportWindow === undefined ? {} : { reportWindow: extras.reportWindow },
+    ...extras.desktopSettings === undefined ? {} : { desktopSettings: extras.desktopSettings },
   })
   return { api, ctx, storageDomain, root }
 }
@@ -256,6 +263,77 @@ describe('host.openPath', () => {
     const pending = api.host.openPath(request({ path: '/tmp/a.txt' }), abort.signal)
     abort.abort()
     expect((await pending).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+  })
+})
+
+describe('host.reportWindow', () => {
+  it('answers desktop-unavailable without a desktop host service', async () => {
+    const { api } = await harness()
+    expect((await api.host.reportWindow(request({ label: 'main', sessionId: null }))).result).toMatchObject({
+      ok: false, error: { code: 'desktop-unavailable' },
+    })
+  })
+
+  it('reports the window session through the injected bridge', async () => {
+    const seen: { label: string; sessionId: string | null }[] = []
+    const { api } = await harness(undefined, undefined, {
+      reportWindow: async (label, sessionId) => { seen.push({ label, sessionId }) },
+    })
+    expect((await api.host.reportWindow(request({ label: 'main', sessionId: 's1' }))).result)
+      .toEqual({ ok: true, value: { reported: true } })
+    expect(seen).toEqual([{ label: 'main', sessionId: 's1' }])
+  })
+
+  it('folds a bridge failure into an internal error', async () => {
+    const { api } = await harness(undefined, undefined, {
+      reportWindow: async () => { throw new Error('shell gone') },
+    })
+    expect((await api.host.reportWindow(request({ label: 'main', sessionId: null }))).result).toMatchObject({
+      ok: false, error: { code: 'internal' },
+    })
+  })
+})
+
+describe('desktop.getSettings / desktop.setSettings', () => {
+  it('answers desktop-unavailable without a desktop host service', async () => {
+    const { api } = await harness()
+    expect((await api.desktop.getSettings(request({}))).result).toMatchObject({
+      ok: false, error: { code: 'desktop-unavailable' },
+    })
+    expect((await api.desktop.setSettings(request({ closeToTray: true }))).result).toMatchObject({
+      ok: false, error: { code: 'desktop-unavailable' },
+    })
+  })
+
+  it('reads and writes settings through the injected bridge', async () => {
+    let stored = { closeToTray: false, launchAtLogin: true }
+    const { api } = await harness(undefined, undefined, {
+      desktopSettings: {
+        get: async () => stored,
+        set: async (partial) => { stored = { ...stored, ...partial }; return stored },
+      },
+    })
+    expect((await api.desktop.getSettings(request({}))).result).toEqual({
+      ok: true, value: { closeToTray: false, launchAtLogin: true },
+    })
+    expect((await api.desktop.setSettings(request({ closeToTray: true }))).result).toEqual({
+      ok: true, value: { closeToTray: true, launchAtLogin: true },
+    })
+  })
+
+  it('folds a bridge failure into an internal error', async () => {
+    const { api } = await harness(undefined, undefined, {
+      desktopSettings: {
+        get: async () => { throw new Error('shell gone') },
+        set: async () => { throw new Error('shell gone') },
+      },
+    })
+    expect((await api.desktop.getSettings(request({}))).result).toMatchObject({
+      ok: false, error: { code: 'internal' },
+    })
+    expect((await api.desktop.setSettings(request({ launchAtLogin: false }))).result).toMatchObject({
+      ok: false, error: { code: 'internal' },
+    })
   })
 })
 

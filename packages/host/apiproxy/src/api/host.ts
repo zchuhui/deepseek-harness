@@ -93,4 +93,14 @@ export interface HostApi {
     request: RpcRequest<{ path: string }>,
     signal: AbortSignal,
   ): Promise<RpcResponse<{ opened: true }>>
+
+  /**
+   * Report which session this window currently shows to the desktop shell
+   * bridge, so a deep link focuses the window that already shows that session
+   * instead of opening a new one. A plain `dsh web` deployment (no desktop
+   * host service composed) answers `desktop-unavailable`.
+   */
+  reportWindow(
+    request: RpcRequest<{ label: string; sessionId: string | null }>,
+  ): Promise<RpcResponse<{ reported: true }>>
 }

@@ -11,7 +11,7 @@ import { SlotRegistry } from './slots.ts'
 import { SessionRuntime } from './sessions/service.ts'
 import type { SessionListState } from './sessions/service.ts'
 import { WorkspaceRuntime } from './workspaces/service.ts'
-import { deepLinkSessionId } from './workspaces/deep-link.ts'
+import { deepLinkSessionId, windowLabel } from './workspaces/deep-link.ts'
 import type { ConversationSnapshot } from './sessions/conversation.ts'
 import type { UseProjection } from './sessions/projection-store.ts'
 import { ConversationEventRegistry } from './conversation/event-registry.ts'
@@ -207,6 +207,43 @@ export function apply(ctx: Context): void {
     () => workspaces.startInitialSelection(preferredSessionId),
     'runtime: initial Workspace selection',
   )
+  // Desktop-shell window reporting: a shell window's URL carries ?win=<label>
+  // ("main" or "win-<n>"), and the shell routes deep links by the session
+  // each window shows. This tab reports its current session so sessions the
+  // operator opens through the sidebar focus the window that shows them
+  // instead of opening a new one. Browser tabs without the label never
+  // report; a host without the desktop shell answers desktop-unavailable and
+  // the report is dropped.
+  const shellWindowLabel = typeof window === 'undefined'
+    ? undefined
+    : windowLabel(window.location.search)
+  if (shellWindowLabel !== undefined) {
+    let baselineReady = workspaces.list.getSnapshot().baselinesReady
+    let lastReported: SessionId | null | undefined = undefined
+    const reportWindow = (): void => {
+      if (!baselineReady) return
+      const current = sessions.list.getSnapshot().current ?? null
+      if (current === lastReported) return
+      lastReported = current
+      void connection.api.host.reportWindow({ label: shellWindowLabel, sessionId: current }).catch(() => {
+        // Best-effort: desktop-unavailable or a transient bridge failure only
+        // degrades deep-link routing to opening a new window.
+      })
+    }
+    ctx.effect(() => {
+      const disposers = [
+        sessions.list.subscribe(reportWindow),
+        workspaces.list.subscribe(() => {
+          baselineReady = workspaces.list.getSnapshot().baselinesReady
+          reportWindow()
+        }),
+      ]
+      reportWindow()
+      return () => {
+        for (const dispose of disposers) dispose()
+      }
+    }, 'runtime: desktop window-session reporting')
+  }
   const loop = connection.start({
     onMuxEnvelope: (envelope) => {
       sessions.handleMuxEnvelope(envelope)

@@ -18,7 +18,12 @@ import {
   hostCreateDirectoryRequestSchema, hostCreateDirectoryValueSchema,
   hostDescribeRequestSchema, hostDescribeValueSchema,
   hostListDirectoryRequestSchema, hostListDirectoryValueSchema,
+  hostReportWindowRequestSchema, hostReportWindowValueSchema,
 } from '../src/api/host.schema.ts'
+import {
+  desktopGetSettingsRequestSchema, desktopGetSettingsValueSchema,
+  desktopSetSettingsRequestSchema, desktopSetSettingsValueSchema,
+} from '../src/api/desktop.schema.ts'
 import {
   workspaceArchiveSessionRequestSchema, workspaceArchiveSessionValueSchema,
   workspaceCreateRequestSchema, workspaceCreateValueSchema, workspaceIdSchema,
@@ -79,6 +84,7 @@ describe('rpcErrorSchema', () => {
     expect(rpcErrorSchema.parse({ code: 'title-invalid', message: 'm', details: { sessionId: 's' } }).code).toBe('title-invalid')
     // The credentials producer still emits this code, so the branch has to stay.
     expect(rpcErrorSchema.parse({ code: 'credential-rejected', message: 'm', details: { ref: 'r' } }).code).toBe('credential-rejected')
+    expect(rpcErrorSchema.parse({ code: 'desktop-unavailable', message: 'm', details: {} }).code).toBe('desktop-unavailable')
     expect(rpcErrorSchema.parse({ code: 'internal', message: 'm', details: {} }).code).toBe('internal')
   })
 
@@ -341,6 +347,33 @@ describe('host domain schemas', () => {
       expect(() => hostCreateDirectoryRequestSchema.parse({ path: '/x', name })).toThrow()
     }
     expect(hostCreateDirectoryValueSchema.parse({ path: '/x/new' })).toEqual({ path: '/x/new' })
+  })
+
+  it('validates the reportWindow request/value', () => {
+    expect(hostReportWindowRequestSchema.parse({ label: 'main', sessionId: null })).toEqual({ label: 'main', sessionId: null })
+    expect(hostReportWindowRequestSchema.parse({ label: 'win-2', sessionId: 's1' }).sessionId).toBe('s1')
+    expect(() => hostReportWindowRequestSchema.parse({ label: 'main', sessionId: undefined })).toThrow()
+    expect(hostReportWindowValueSchema.parse({ reported: true })).toEqual({ reported: true })
+    expect(() => hostReportWindowValueSchema.parse({ reported: false })).toThrow()
+  })
+})
+
+describe('desktop domain schemas', () => {
+  it('validates the settings request/value pairs', () => {
+    expect(desktopGetSettingsRequestSchema.parse({})).toEqual({})
+    expect(desktopSetSettingsRequestSchema.parse({})).toEqual({})
+    expect(desktopSetSettingsRequestSchema.parse({ closeToTray: true })).toEqual({ closeToTray: true })
+    expect(desktopSetSettingsRequestSchema.parse({
+      launchAtLogin: false, closeToTray: true,
+    })).toEqual({ closeToTray: true, launchAtLogin: false })
+    expect(() => desktopSetSettingsRequestSchema.parse({ closeToTray: 'yes' })).toThrow()
+    expect(desktopGetSettingsValueSchema.parse({
+      closeToTray: true, launchAtLogin: false,
+    })).toEqual({ closeToTray: true, launchAtLogin: false })
+    expect(() => desktopGetSettingsValueSchema.parse({ closeToTray: true })).toThrow()
+    expect(desktopSetSettingsValueSchema.parse({
+      closeToTray: false, launchAtLogin: true,
+    })).toEqual({ closeToTray: false, launchAtLogin: true })
   })
 })
 

@@ -53,7 +53,7 @@ Windows 与 Linux 上,协议启动会拉起第二个进程;`tauri-plugin-single-
 
 用 `node scripts/build-and-sign.mjs` 构建并签名:它以 `createUpdaterArtifacts` 运行 `tauri build --bundles nsis`,用本地 minisign 私钥(`updater.key`,已 gitignore——私钥永不离开构建机;公钥内嵌于 `tauri.conf.json`)给安装器签名,并组装 `update-manifest.json`(版本、notes、pub_date、各平台签名与下载 URL)。`UPDATE_VERSION_OVERRIDE` 写入抬高的清单版本用于本地演练更新流程,`UPDATE_MANIFEST_BASE_URL` 覆盖安装件 URL。
 
-安装器本身的 Authenticode 代码签名不在本里程碑(需要发布方自有证书);updater 的工件签名即上述 minisign 链。
+安装器本身的 Authenticode 签名由同一脚本驱动:`AUTHENTICODE_CERT`(.pfx 路径)与 `AUTHENTICODE_PASSWORD` 就位时,构建把 `bundle.windows.signCommand` 指向 `scripts/sign-windows.mjs`(signtool 调用;可用 `AUTHENTICODE_SIGNTOOL` 指到 SDK bin 下的完整路径,`AUTHENTICODE_TIMESTAMP_URL` 换时间戳服务器)。tauri 先对安装器做 Authenticode、后计算 minisign 工件签名,所以 `.sig` 覆盖的是签名后的安装器。证书缺失时构建照常产出未签名安装器并打印说明;发布方证书仍由发布负责人持有。
 
 ## 桥接契约(host -> 壳原语)
 
@@ -67,6 +67,7 @@ Windows 与 Linux 上,协议启动会拉起第二个进程;`tauri-plugin-single-
 | `/api/desktop/windows/open` | POST | `{ sessionId? }` 新建一个窗口(id 须安全)并登记;`{ label, sessionId }` |
 | `/api/desktop/windows/close` | POST | `{ label }` 关闭窗口——主窗口改为隐藏;`{ closed: true }` 或 404 |
 | `/api/desktop/windows/focus` | POST | `{ label }` 显示、还原并聚焦;`{ focused: true }` 或 404 |
+| `/api/desktop/windows/assign` | POST | `{ label, sessionId }` 记录某窗口当前显示的会话(客户端报告的一半,另一半是壳自身路由的启动目标);`{ assigned: true }`、404(未知 label)或 400(不安全 id) |
 | `/api/desktop/windows` | GET | `{ windows: [{ label, sessionId }] }` —— 注册表快照;无目标时 `sessionId` 为 null |
 | `/api/desktop/settings` | GET | `{ closeToTray, launchAtLogin }` —— 壳设置文档 |
 | `/api/desktop/settings` | POST | 部分文档 `{ closeToTray?, launchAtLogin? }`;OS 副作用先于持久化执行;应答完整的更新后文档 |
@@ -81,10 +82,9 @@ Tauri IPC 命令 `get_state`、`toast`、`pick_directory`、`get_settings`、`se
 
 ## 已知限制与待办
 
-- **无 Authenticode 签名** —— NSIS 安装器本身不带发布方证书;只有 updater 工件做了 minisign 签名。发布方签名需要发布负责人自己的证书。
+- **Authenticode 证书未配置** —— 签名工具链已就位(见上文 `AUTHENTICODE_*`),但发布方证书需发布负责人持有;没有证书时构建产出未签名安装器。
 - **仅开发自托管更新** —— updater 端点与安装件 URL 指向壳自身的回环桥接;生产部署必须把清单与安装器托管在 HTTPS 上并轮换签名密钥。
 - **GNU 工具链未验证** —— 面向 MSVC host 开发;GNU 链接器可能需要额外配置。
-- **壳只跟踪壳发起的导航** —— 窗口注册表记录每个窗口被路由到的会话;操作员在 web GUI 侧栏打开的会话不会被跟踪,因此指向这种会话的深链会新建窗口而不是聚焦已显示它的窗口。客户端到壳的反馈通道会改进这一点。
-- **设置 UI 是壳原生的,launchAtLogin 仅 Windows** —— 托盘「设置」项打开内置设置窗口;web GUI 内还没有设置页,开机自启的 Run 键只存在于 Windows。macOS/Linux 的登录自启等待各自平台的里程碑。
-- **toast 身份是 PowerShell 的** —— Windows toast 已能经 `dsh` 协议正确激活,但在安装器里程碑注册壳自身的 AUMID 快捷方式之前,toast 显示在 Windows PowerShell 的身份下。
+- **AUMID 快捷方式注册失败时 toast 回退 PowerShell 身份** —— 壳每次启动都把开始菜单里的 `DeepSeek Harness.lnk` 重写为自己 AUMID 的快捷方式,失败时启动日志报错并回退旧的 PowerShell toast 身份。
+- **launchAtLogin 仅 Windows** —— web GUI 设置页与壳原生设置窗口都能读写 `closeToTray`/`launchAtLogin`,但开机自启的 Run 键只存在于 Windows;macOS/Linux 的登录自启等待各自平台的里程碑。
 - **macOS/Linux 的 toast 点击穿透** —— 目前只有 Windows toast 携带协议激活;notification 插件在其余平台没有激活回调。

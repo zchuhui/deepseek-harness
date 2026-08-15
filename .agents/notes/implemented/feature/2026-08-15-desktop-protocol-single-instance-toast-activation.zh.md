@@ -14,7 +14,7 @@ Status: implemented
 - **始终只有一个壳在运行。** `tauri-plugin-single-instance`(最先注册,启用 `deep-link` feature)持有实例身份;Windows/Linux 上协议启动会拉起第二个进程,其 argv 携带 URL,插件把 argv 转发进运行中的壳。回调把 `dsh://` 路由为显示主窗口,把 `dsh://session/<id>` 路由为导航。
 - **单一规范语法**,位于 `desktop-app/src-tauri/src/deeplink.rs`:`parse_deep_link` 只接受 `dsh://`(Home)与 `dsh://session/<id>`(id 须匹配 `[A-Za-z0-9_-]{1,256}`),其余一律丢弃。`handle_url` 把会话目标存为待跳转通知深链并调用 `navigate_main`(显示/还原/聚焦 + `window.location.href` eval),托盘项改为复用该函数而不是重复实现。
 - **协议冷启动主实例。** 注册之后在 `setup` 里读取 `deep_link().get_current()`(Windows/Linux 把链接作为唯一 argv 项传入)。macOS 以 `deep-link://new-url` 事件投递,注册了监听器;macOS 的冷启动投递与协议注册随安装器里程碑。
-- **无 AUMID 快捷方式的 Windows toast 激活。** `toast.rs` 把桥接 toast 渲染为 PowerShell 5.1 WinRT toast,携带 `activationType="protocol"` 与 `launch="dsh://session/<id>"`,点击即启动协议处理器并路由回运行中的壳。标题、正文与 appId 以转义字面量嵌入——`escape_xml` 后再做 PowerShell 单引号翻倍,UTF-16LE base64 `-EncodedCommand`——与 `packages/notify/notifications-windows` 同一模式。toast 仍显示在 PowerShell 的 AppUserModelID 下;壳自己的身份等待安装器里程碑。
+- **无 AUMID 快捷方式的 Windows toast 激活。** `toast.rs` 把桥接 toast 渲染为 PowerShell 5.1 WinRT toast,携带 `activationType="protocol"` 与 `launch="dsh://session/<id>"`,点击即启动协议处理器并路由回运行中的壳。标题、正文与 appId 以转义字面量嵌入——`escape_xml` 后再做 PowerShell 单引号翻倍,UTF-16LE base64 `-EncodedCommand`——与 `packages/notify/notifications-windows` 同一模式。壳现在每次启动都把开始菜单的 `DeepSeek Harness.lnk` 重写为自身 AUMID 的快捷方式(`aumid.rs`),toast 显示在壳自己的身份下;注册失败时回退 PowerShell 身份。
 
 ## 已考虑的替代方案
 
@@ -27,7 +27,7 @@ Status: implemented
 
 - 深链在 dev 与免安装部署中端到端可用:从浏览器、shell 命令或 toast 点击发起的 `dsh://session/<id>` 都能在主窗口打开对应会话。
 - 单一导航路径(`navigate_main`)服务托盘点击、协议启动与事件投递。
-- Windows toast 点击穿透今天即可用;toast 身份仍是 PowerShell 的,直到安装器注册壳的 AUMID(desktop-app README 已知限制已更新)。
+- Windows toast 点击穿透可用;toast 身份是壳自身的 AUMID(每次启动注册的开始菜单快捷方式),注册失败才回退 PowerShell 身份。
 - macOS/Linux 的 toast 点击穿透仍然缺失(notification 插件限制);Linux 协议注册已接线但未在本机验证。
 
-相关:[桌面能力接缝](2026-08-14-desktop-capability-seams-notifications-updater.md)、[壳桥接消费者](2026-08-14-desktop-shell-bridge-consumers.md)。
+相关:[桌面能力接缝](../architecture/2026-08-14-desktop-capability-seams-notifications-updater.md)、[壳桥接消费者](../architecture/2026-08-14-desktop-shell-bridge-consumers.md)。

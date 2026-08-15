@@ -24,4 +24,4 @@ The desktop shell's bridge listener vanished shortly after boot: smoke probes sh
 - Verified on this host: after the fix the bridge listener survives 8 s of idle, answers 401 to untokenized requests, and keeps listening after requests.
 - The milestone-2 bridge never served a request older than its first idle timeout; every desktop provider consumer that worked before did so only within that window.
 
-Related: [protocol deep links, single instance, and toast activation](2026-08-15-desktop-protocol-single-instance-toast-activation.md).
+Related: [protocol deep links, single instance, and toast activation](../feature/2026-08-15-desktop-protocol-single-instance-toast-activation.md).

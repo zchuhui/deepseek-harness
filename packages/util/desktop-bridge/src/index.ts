@@ -63,10 +63,6 @@ export class DesktopBridgeError extends Error {
   }
 }
 
-/**
- * One shell-reported update state. absent fields are null in the wire JSON;
- * providers map this onto their own UpdateState vocabulary.
- */
 /** The shell settings document. */
 export interface DesktopSettings {
   /** Whether closing the main window hides it instead of quitting. */
@@ -83,11 +79,20 @@ export interface DesktopWindowInfo {
   sessionId: string | null
 }
 
+/**
+ * One shell-reported update state. Absent fields are null in the wire JSON;
+ * providers map this onto their own UpdateState vocabulary.
+ */
 export interface DesktopUpdateState {
+  /** Update channel the shell reported (the tauri updater's own channel). */
   channel: string
+  /** Running shell version, or null before the first check answers. */
   currentVersion: string | null
+  /** Epoch milliseconds of the last check, or null before the first one. */
   checkedAt: number | null
+  /** The offered update, or null when the shell is latest. */
   available: { version: string; publishedAt: number } | null
+  /** The last failed check with its epoch milliseconds, or null. */
   lastFailure: { message: string; at: number } | null
 }
 
@@ -191,6 +196,17 @@ export class DesktopBridge {
   async listWindows(): Promise<DesktopWindowInfo[]> {
     const answer = await this.request('GET', '/api/desktop/windows') as { windows: DesktopWindowInfo[] }
     return answer.windows
+  }
+
+  /**
+   * Record the session one window now shows (the client-reported half of the
+   * shell's window registry), so a deep link focuses the owning window
+   * instead of opening a new one.
+   * @param label - shell window label ("main" or "win-<n>"); unknown labels 404.
+   * @param sessionId - session the window shows, or null for none.
+   */
+  async assignWindow(label: string, sessionId: string | null): Promise<void> {
+    await this.request('POST', '/api/desktop/windows/assign', { label, sessionId })
   }
 
   /**

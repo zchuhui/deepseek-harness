@@ -82,9 +82,9 @@ describe('DesktopUpdater', () => {
     await expect(updater.check()).rejects.toThrow('whitespace')
   })
 
-  it('apply forwards the shell refusal', async () => {
-    const fetchFn = stubFetch(() => new Response(JSON.stringify({ error: 'apply is not implemented in the skeleton milestone' }), { status: 501 }))
+  it('apply forwards a shell failure', async () => {
+    const fetchFn = stubFetch(() => new Response(JSON.stringify({ error: 'update apply failed on the shell' }), { status: 500 }))
     const { updater } = await harness({}, fetchFn)
-    await expect(updater.apply('2.0.0')).rejects.toThrow('not implemented in the skeleton milestone')
+    await expect(updater.apply('2.0.0')).rejects.toThrow('update apply failed on the shell')
   })
 })

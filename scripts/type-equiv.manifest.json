@@ -1924,6 +1924,11 @@
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/desktop.md",
+      "symbol": "DesktopSettingsDoc",
+      "source": "packages/host/desktop/src/index.ts"
     }
   ]
 }

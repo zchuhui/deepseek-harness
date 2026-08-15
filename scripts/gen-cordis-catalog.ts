@@ -65,6 +65,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   compaction: 'compaction.md',
   cordisInspect: 'extensions.md',
   credentials: 'credentials.md',
+  desktopHost: 'desktop.md',
   directoryPicker: 'workspace.md',
   dynamicCordisRunner: 'extensions.md',
   e2b: 'subprocess.md',
@@ -75,6 +76,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   llm: 'llm-streaming.md',
   lsp: 'lsp.md',
   messageFeedback: 'feedback.md',
+  notifications: 'desktop.md',
   permissionPresets: 'permission-presets.md',
   planMode: 'plan.md',
   terminals: 'terminal.md',
@@ -102,6 +104,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   tools: 'tools.md',
   typert: 'typert.md',
   typertGateway: 'typert.md',
+  updater: 'desktop.md',
   userQuestions: 'user-questions.md',
   web: 'web.md',
   workflowEngine: 'workflow.md',
@@ -262,6 +265,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   MessageFeedbackTargetNotFound: 'feedback.md',
   MessageFeedbackVersion: 'feedback.md',
   MessageFeedbackVersionConflict: 'feedback.md',
+  DesktopSettingsDoc: 'desktop.md',
   UserMessage: 'session.md',
   PreStepDecision: 'core.md',
   PreStepContext: 'core.md',
@@ -578,6 +582,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   WorkflowAgentEndInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowAgentInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowResultInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
+  Notification: 'notification payload contract is owned by packages/notify/notifications/README.md',
+  UpdateState: 'update state contract is owned by packages/updater/updater/README.md',
 }
 
 /** Repository data policy consumed by the Cordis catalog projector. */

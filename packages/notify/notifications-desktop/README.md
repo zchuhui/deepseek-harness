@@ -22,5 +22,5 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **No click-through** — toasts carry text only; navigation back to a session needs the desktop shell's deep-link milestone.
+- **No macOS/Linux click-through** — Windows toasts activate the `dsh://session/<id>` protocol and click back into the session; the notification plugin offers no activation callback on the other platforms.
 - **No delivery acknowledgement** — the shell only proves the toast request was accepted, not that the OS showed it.

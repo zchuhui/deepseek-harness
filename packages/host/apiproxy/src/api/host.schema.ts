@@ -72,3 +72,14 @@ export const hostOpenPathRequestSchema = z.object({
 export const hostOpenPathValueSchema = z.object({
   opened: z.literal(true),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.openPath'>>>
+
+/** host.reportWindow request payload: the shell window label and the session it shows. */
+export const hostReportWindowRequestSchema = z.object({
+  label: z.string(),
+  sessionId: z.string().nullable(),
+}) satisfies z.ZodType<Wire<RequestPayload<'host.reportWindow'>>>
+
+/** host.reportWindow response value. */
+export const hostReportWindowValueSchema = z.object({
+  reported: z.literal(true),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.reportWindow'>>>

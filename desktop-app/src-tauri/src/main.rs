@@ -9,6 +9,8 @@
 //! single-instance plugin forwards that argv into the first process. macOS
 //! delivers links through `deep-link://new-url` events instead.
 
+#[cfg(windows)]
+mod aumid;
 mod bridge;
 mod commands;
 mod deeplink;
@@ -91,6 +93,31 @@ fn main() {
             };
             app.manage(settings::SettingsState::new(settings, settings_file));
 
+            // Windows toast identity: the Start Menu shortcut registers the
+            // shell's AppUserModelID, and toasts show under it. Registration
+            // failure falls back to the PowerShell identity used before.
+            let toast_app_id = {
+                #[cfg(windows)]
+                {
+                    let app_id = app.config().identifier.clone();
+                    match crate::aumid::ensure_shortcut(
+                        &std::env::current_exe().unwrap_or_default(),
+                        &app_id,
+                    ) {
+                        Ok(_) => app_id,
+                        Err(error) => {
+                            eprintln!("dsh-desktop: toast identity registration failed: {error}");
+                            crate::toast::POWERSHELL_APP_ID.to_string()
+                        }
+                    }
+                }
+                #[cfg(not(windows))]
+                {
+                    app.config().identifier.clone()
+                }
+            };
+            app.manage(crate::toast::ToastAppId(toast_app_id));
+
             let token = bridge::generate_token();
             let bridge_url = format!("http://127.0.0.1:{bridge_port}");
             let handle = app.handle().clone();
@@ -160,12 +187,13 @@ fn main() {
                 std::mem::forget(manager); // a reused service must outlive the shell
             }
 
-            let main_url = match &boot_target {
-                Some(deeplink::DeepLinkTarget::Session(id)) => {
-                    format!("http://127.0.0.1:{port}/?session={id}")
-                }
-                _ => format!("http://127.0.0.1:{port}"),
+            // The main window's URL always carries its label, so the web client
+            // can report which session it shows back through the bridge.
+            let session = match &boot_target {
+                Some(deeplink::DeepLinkTarget::Session(id)) => Some(id.as_str()),
+                _ => None,
             };
+            let main_url = windows::window_url(port, session, windows::MAIN_LABEL);
             let url: WebviewUrl =
                 WebviewUrl::External(main_url.parse().expect("loopback url parses"));
             let window = WebviewWindowBuilder::new(app, windows::MAIN_LABEL, url)

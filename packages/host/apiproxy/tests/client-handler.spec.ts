@@ -21,6 +21,7 @@ function scriptedApi(overrides: {
   sessions?: Partial<ApiProxy['sessions']>
   subagents?: Partial<ApiProxy['subagents']>
   host?: Partial<ApiProxy['host']>
+  desktop?: Partial<ApiProxy['desktop']>
   skills?: Partial<ApiProxy['skills']>
   agentPresets?: Partial<ApiProxy['agentPresets']>
   events?: Partial<ApiProxy['events']>
@@ -78,7 +79,13 @@ function scriptedApi(overrides: {
       listDirectory: r => ok(r, { path: '/t', home: '/t', crumbs: [], entries: [], truncated: false }),
       createDirectory: r => ok(r, { path: '/t/new' }),
       openPath: r => ok(r, { opened: true as const }),
+      reportWindow: r => ok(r, { reported: true as const }),
       ...overrides.host,
+    },
+    desktop: {
+      getSettings: r => ok(r, { closeToTray: false, launchAtLogin: false }),
+      setSettings: r => ok(r, { closeToTray: false, launchAtLogin: false }),
+      ...overrides.desktop,
     },
     workspace: {
       list: r => ok(r, { items: [], archivedSessionIds: [] }),

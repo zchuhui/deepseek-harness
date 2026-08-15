@@ -159,6 +159,17 @@ describe('DesktopBridge', () => {
     expect(stub.calls[4]).toMatchObject({ method: 'GET', url: 'http://127.0.0.1:3901/api/desktop/windows' })
     stub.respond(200, { windows: [{ label: 'main', sessionId: null }] })
     expect(await listed).toEqual([{ label: 'main', sessionId: null }])
+
+    const assigned = bridge.assignWindow('main', 'sess-9')
+    expect(stub.calls[5]).toMatchObject({ method: 'POST', url: 'http://127.0.0.1:3901/api/desktop/windows/assign' })
+    expect(JSON.parse(stub.calls[5]!.body!)).toEqual({ label: 'main', sessionId: 'sess-9' })
+    stub.respond(200, { assigned: true })
+    await assigned
+
+    const cleared = bridge.assignWindow('main', null)
+    expect(JSON.parse(stub.calls[6]!.body!)).toEqual({ label: 'main', sessionId: null })
+    stub.respond(200, { assigned: true })
+    await cleared
   })
 
   it('fetches and applies the shell settings document', async () => {

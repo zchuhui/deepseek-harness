@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-15-desktop-bridge-idle-timeout.md
-2026-08-15-desktop-bridge-idle-timeout.md: 3a3f582404ee3e48597b70aaf97aa6c16c2f1fb7
-2026-08-15-desktop-bridge-idle-timeout.zh.md: a62e19af041c35570cd27e92ce5daf6fcb3c8c7b
+2026-08-15-desktop-bridge-idle-timeout.md: 2858ea18392e0e2c68d5fef4bb3059869bd3b656
+2026-08-15-desktop-bridge-idle-timeout.zh.md: 82fe9cebbf6d03152ffea93536c4c199cf4df02d

@@ -526,6 +526,30 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'desktopHost',
+    summary: 'Abstract desktop-shell host-control service.',
+    description: 'Abstract desktop-shell host-control service. Subclass, implement the three methods, and load the subclass as a plugin — it registers as `ctx.desktopHost` (one implementation per context; loading a second throws, cordis\' standard duplicate-service behavior).',
+    methods: [
+      {
+        signature: 'abstract reportWindow(label: string, sessionId: string | null): Promise<void>',
+        description: 'Record the session one window now shows (the client-reported half of the shell\'s window registry), so a deep link focuses the owning window.',
+        parameters: [{ name: 'label', description: 'shell window label ("main" or "win-<n>").' }, { name: 'sessionId', description: 'session the window shows, or null for none.' }],
+      },
+      {
+        signature: 'abstract getSettings(): Promise<DesktopSettingsDoc>',
+        description: 'Read the shell settings document.',
+        parameters: [],
+        returns: 'the close-to-tray and launch-at-login flags.',
+      },
+      {
+        signature: 'abstract setSettings(partial: Partial<DesktopSettingsDoc>): Promise<DesktopSettingsDoc>',
+        description: 'Apply a partial settings document; omitted fields keep their values.',
+        parameters: [{ name: 'partial', description: 'close-to-tray and/or launch-at-login.' }],
+        returns: 'the complete updated document.',
+      },
+    ],
+  },
+  {
     key: 'directoryPicker',
     summary: 'Abstract directory-picking service.',
     description: 'Abstract directory-picking service. Subclass, implement `capability()`, and load the subclass as a plugin — it registers as `ctx.directoryPicker` (one implementation per context; loading a second throws, cordis\' standard duplicate-service behavior). The capability object must be stable for the service lifetime: consumers may capture it across calls.',
@@ -903,6 +927,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Delete one feedback item. Absence is successful regardless of the supplied version; an existing item requires an exact version match.',
         parameters: [{ name: 'request', description: 'Session, message, and observed item version.' }],
         returns: 'the stable absent postcondition, or an explicit failure.',
+      },
+    ],
+  },
+  {
+    key: 'notifications',
+    summary: 'Abstract notification service.',
+    description: 'Abstract notification service. Subclass, implement notify, and load the subclass as a plugin — it registers as ctx.notifications (one implementation per context; loading a second throws, which is cordis\' standard duplicate-service behavior).\n\nnotify rejects on delivery failure (unsupported platform, spawn error); the seam defines no fallback, and consumers own failure containment so a broken notification can never break the event dispatch that raised it.',
+    methods: [
+      {
+        signature: 'abstract notify(notification: Notification): Promise<void>',
+        description: 'Deliver one notification on the provider\'s channel.',
+        parameters: [{ name: 'notification', description: 'the consumer-built notification to render.' }],
       },
     ],
   },
@@ -2004,6 +2040,30 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'updater',
+    summary: 'Abstract update service.',
+    description: 'Abstract update service. Subclass, implement the three operations, and load the subclass as a plugin — it registers as `ctx.updater` (one implementation per context; loading a second throws, which is cordis\' standard duplicate-service behavior).',
+    methods: [
+      {
+        signature: 'abstract state(): UpdateState',
+        description: 'Synchronous snapshot of the channel\'s last observed update state. It never triggers a check or any network work.',
+        parameters: [],
+        returns: 'the current snapshot.',
+      },
+      {
+        signature: 'abstract check(signal?: AbortSignal): Promise<UpdateState>',
+        description: 'Explicitly trigger one update check. A provider may perform network work here; the no-op provider only advances the check timestamp.',
+        parameters: [{ name: 'signal', description: 'optional cancellation of the check.' }],
+        returns: 'the post-check snapshot.',
+      },
+      {
+        signature: 'abstract apply(version: string, signal?: AbortSignal): Promise<void>',
+        description: 'Apply one offered update to the named version.',
+        parameters: [{ name: 'version', description: 'the version to apply.' }, { name: 'signal', description: 'optional cancellation of the apply.' }],
+      },
+    ],
+  },
+  {
     key: 'userQuestions',
     summary: '`ctx.userQuestions`: one active UI provider plus an `ask()` API.',
     description: '`ctx.userQuestions`: one active UI provider plus an `ask()` API.',
@@ -2922,6 +2982,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type CredentialRef = Branded<\'CredentialRef\'>;',
   },
   {
+    name: 'DesktopSettingsDoc',
+    declaration: 'export interface DesktopSettingsDoc {\n    closeToTray: boolean;\n    launchAtLogin: boolean;\n}',
+  },
+  {
     name: 'DiffCallView',
     declaration: 'export interface DiffCallView {\n    card: \'diff\';\n    title: string;\n    diffs: FileDiff[];\n    locations?: FileLocation[];\n}',
   },
@@ -3466,6 +3530,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelModalityMap {\n    text: \'text\';\n    image: \'image\';\n}',
   },
   {
+    name: 'Notification',
+    declaration: 'export interface Notification {\n    kind: NotificationKind;\n    title: string;\n    body: string;\n    sessionId?: SessionId;\n}',
+  },
+  {
+    name: 'NotificationKind',
+    declaration: 'export type NotificationKind = NotificationKindMap[keyof NotificationKindMap];',
+  },
+  {
+    name: 'NotificationKindMap',
+    declaration: 'export interface NotificationKindMap {\n    \'job-settled\': \'job-settled\';\n    \'approval-waiting\': \'approval-waiting\';\n    \'turn-failed\': \'turn-failed\';\n}',
+  },
+  {
     name: 'ObjectJsonSchema',
     declaration: 'export type ObjectJsonSchema = JsonSchemaNode & {\n    type: \'object\';\n};',
   },
@@ -3635,7 +3711,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'RpcErrorDetailsMap',
-    declaration: 'export interface RpcErrorDetailsMap {\n    \'bad-request\': {\n        issues: ZodIssue[];\n    };\n    \'cancelled\': {};\n    \'session-not-found\': {\n        sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        provider: string;\n        model: string;\n    };\n    \'session-conflict\': {\n        sessionId: SessionId;\n        requestedCwd: string;\n        existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        value: string;\n    };\n    \'workspace-attach-failed\': {\n        sessionId: SessionId;\n        workspaceId: string;\n    };\n    \'workspace-not-found\': {\n        workspaceId: string;\n    };\n    \'workspace-invalid-path\': {\n        path: string;\n    };\n    \'workspace-name-conflict\': {\n        name: string;\n    };\n    \'workspace-move-invalid\': {\n        workspaceId: string;\n        sessionId: SessionId;\n        beforeSessionId?: SessionId;\n    };\n    \'directory-unreadable\': {\n        path: string;\n    };\n    \'directory-exists\': {\n        path: string;\n    };\n    \'directory-create-failed\': {\n        path: string;\n    };\n    \'directory-picker-unavailable\': {\n        capability: string;\n    };\n    \'agent-preset-read-only\': {\n        agentPreset: string;\n        reason: string;\n    };\n    \'agent-preset-locked\': {\n        sessionId: SessionId;\n        agentPreset: string;\n    };\n    \'agent-preset-conflict\': {\n        sessionId: SessionId;\n        requestedPreset: string;\n        existingPreset?: string;\n    };\n    \'agent-preset-not-found\': {\n        agentPreset: string;\n      /* …truncated — full shape in source */',
+    declaration: 'export interface RpcErrorDetailsMap {\n    \'bad-request\': {\n        issues: ZodIssue[];\n    };\n    \'cancelled\': {};\n    \'session-not-found\': {\n        sessionId: SessionId;\n    };\n    \'model-unavailable\': {\n        provider: string;\n        model: string;\n    };\n    \'session-conflict\': {\n        sessionId: SessionId;\n        requestedCwd: string;\n        existingCwd?: string;\n    };\n    \'invalid-time-zone\': {\n        value: string;\n    };\n    \'workspace-attach-failed\': {\n        sessionId: SessionId;\n        workspaceId: string;\n    };\n    \'workspace-not-found\': {\n        workspaceId: string;\n    };\n    \'workspace-invalid-path\': {\n        path: string;\n    };\n    \'workspace-name-conflict\': {\n        name: string;\n    };\n    \'workspace-move-invalid\': {\n        workspaceId: string;\n        sessionId: SessionId;\n        beforeSessionId?: SessionId;\n    };\n    \'directory-unreadable\': {\n        path: string;\n    };\n    \'directory-exists\': {\n        path: string;\n    };\n    \'directory-create-failed\': {\n        path: string;\n    };\n    \'directory-picker-unavailable\': {\n        capability: string;\n    };\n    \'desktop-unavailable\': {};\n    \'agent-preset-read-only\': {\n        agentPreset: string;\n        reason: string;\n    };\n    \'agent-preset-locked\': {\n        sessionId: SessionId;\n        agentPreset: string;\n    };\n    \'agent-preset-conflict\': {\n        sessionId: SessionId;\n        requestedPreset: string;\n        existingPreset?: string;\n    };\n    \'agent-preset-not-found\': {\n    /* …truncated — full shape in source */',
   },
   {
     name: 'RpcId',
@@ -4520,6 +4596,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TypertTypeModel',
     declaration: 'export interface TypertTypeModel {\n    readonly name: string;\n    readonly declaration: string;\n}',
+  },
+  {
+    name: 'UpdateChannel',
+    declaration: 'export type UpdateChannel = Branded<\'UpdateChannel\'>;',
+  },
+  {
+    name: 'UpdateState',
+    declaration: 'export interface UpdateState {\n    channel: UpdateChannel;\n    currentVersion: string | null;\n    checkedAt?: number;\n    available?: {\n        version: string;\n        publishedAt: number;\n    } | null;\n    lastFailure?: {\n        message: string;\n        at: number;\n    };\n}',
   },
   {
     name: 'UserMessage',

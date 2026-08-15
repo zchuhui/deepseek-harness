@@ -53,6 +53,19 @@ flowchart LR
   pkg_credentials["credentials"]
   svc_credentials["ctx.credentials<br/>Credential seam"]
   pkg_credentials_local["credentials-local"]
+  pkg_desktop["desktop"]
+  svc_desktopHost["ctx.desktopHost<br/>Desktop shell host control"]
+  pkg_desktop_shell["desktop-shell"]
+  pkg_notifications["notifications"]
+  svc_notifications["ctx.notifications<br/>Operator notification seam"]
+  pkg_notifications_terminal["notifications-terminal"]
+  pkg_notifications_windows["notifications-windows"]
+  pkg_notifications_desktop["notifications-desktop"]
+  pkg_notify_events["notify-events"]
+  pkg_updater["updater"]
+  svc_updater["ctx.updater<br/>Update capability seam"]
+  pkg_updater_manual["updater-manual"]
+  pkg_updater_desktop["updater-desktop"]
   pkg_session_telemetry["session-telemetry"]
   svc_sessionTelemetry["ctx.sessionTelemetry<br/>Session telemetry seam"]
   pkg_session_telemetry_otel["session-telemetry-otel"]
@@ -217,6 +230,8 @@ flowchart LR
   pkg_cordis_host_runner --> svc_dynamicCordisRunner
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
+  pkg_desktop --> svc_desktopHost
+  pkg_desktop_shell --> svc_desktopHost
   pkg_directory_picker --> svc_directoryPicker
   pkg_directory_picker_browse --> svc_directoryPicker
   pkg_directory_picker_native --> svc_directoryPicker
@@ -237,6 +252,10 @@ flowchart LR
   pkg_lsp_local --> svc_lsp
   pkg_message_feedback --> svc_messageFeedback
   pkg_modules --> svc_clientModules
+  pkg_notifications --> svc_notifications
+  pkg_notifications_desktop --> svc_notifications
+  pkg_notifications_terminal --> svc_notifications
+  pkg_notifications_windows --> svc_notifications
   pkg_permission_presets --> svc_permissionPresets
   pkg_plan_mode --> svc_planMode
   pkg_pwsh_local --> svc_shell
@@ -286,6 +305,9 @@ flowchart LR
   pkg_token_meter --> svc_tokenMeter
   pkg_tools --> svc_tools
   pkg_typert_registry --> svc_typert
+  pkg_updater --> svc_updater
+  pkg_updater_desktop --> svc_updater
+  pkg_updater_manual --> svc_updater
   pkg_user_questions --> svc_userQuestions
   pkg_web --> svc_web
   pkg_web_fetch_http --> svc_web
@@ -314,6 +336,7 @@ flowchart LR
   svc_credentials --> pkg_apiproxy
   svc_credentials --> pkg_llm_deepseek
   svc_credentials --> pkg_llm_pi_ai
+  svc_desktopHost --> pkg_apiproxy
   svc_directoryPicker --> pkg_apiproxy
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_e2b --> pkg_fs_e2b
@@ -330,6 +353,7 @@ flowchart LR
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
+  svc_notifications --> pkg_notify_events
   svc_sandbox --> pkg_bash_sandbox
   svc_sandbox --> pkg_terminal_bash
   svc_sandboxPolicy --> pkg_bash_sandbox
@@ -424,6 +448,9 @@ flowchart LR
 | `ctx.sessionPersistence` | `seam` | [`session-persistence`](../packages/session/session-persistence) | [`session-persistence-jsonl`](../packages/session/session-persistence-jsonl), [`session-persistence-sqlite`](../packages/session/session-persistence-sqlite) | [`agent-loop`](../packages/core/agent-loop), [`tool-bash`](../packages/shell/tool-bash), [`hooks-claude-code`](../packages/hooks/hooks-claude-code), [`hooks-codex`](../packages/hooks/hooks-codex), [`session-query`](../packages/session-query/session-query), [`session-query-sqlite`](../packages/session-query/session-query-sqlite), [`message-feedback`](../packages/feedback/message-feedback) | - | 各后端持久化同一套 SessionEvent 词汇；应用在组合时选择后端。 |
 | `ctx.settings` | `seam` | [`settings`](../packages/settings/settings) | [`settings-file`](../packages/settings/settings-file) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), `apiproxy` | - | 插件注册命名空间 schema 并解析分层值；提供方存储原始文档。LLM（大语言模型）适配器在用户分区下将其入口配置注册为组合基础；Web 网关提供经过脱敏的分层描述符，并写入用户层。 |
 | `ctx.credentials` | `seam` | [`credentials`](../packages/credentials/credentials) | [`credentials-local`](../packages/credentials/credentials-local) | [`llm-deepseek`](../packages/llm/llm-deepseek), [`llm-pi-ai`](../packages/llm/llm-pi-ai), `apiproxy` | - | 配置携带对机密信息的引用；提供方拥有实际值。消费方按操作解析，因此轮换后的凭据会在紧接着的下一次请求中生效；Web 网关提供不含实际值的视图和只写存储。 |
+| `ctx.desktopHost` | `seam` | `desktop` | `desktop-shell` | `apiproxy` | - | 通过带 token 鉴权的壳桥接驱动壳的原生窗口注册表与持久化设置；浏览器上报其窗口当前显示的会话，API 网关提供 loopback 钉定的桌面 RPC 方法。 |
+| `ctx.notifications` | `seam` | [`notifications`](../packages/notify/notifications) | [`notifications-terminal`](../packages/notify/notifications-terminal), [`notifications-windows`](../packages/notify/notifications-windows), [`notifications-desktop`](../packages/notify/notifications-desktop) | [`notify-events`](../packages/notify/notify-events) | - | 事件桥接为每个被观测到的事件发起一条通知；提供方在操作员通道上投递（日志行、Windows toast 或桌面壳 toast）。 |
+| `ctx.updater` | `seam` | [`updater`](../packages/updater/updater) | [`updater-manual`](../packages/updater/updater-manual), [`updater-desktop`](../packages/updater/updater-desktop) | - | - | 提供方在 state()、check() 与 apply() 背后提供更新源与应用机制；桌面提供方转发给壳的 Tauri updater。目前还没有组件直接消费该服务。 |
 | `ctx.sessionTelemetry` | `seam` | [`session-telemetry`](../packages/session/session-telemetry) | [`session-telemetry-otel`](../packages/session/session-telemetry-otel) | - | - | 该 seam 捕获会话记录、进行脱敏并交给一个后端；没有其他组件消费该服务，其输出会离开当前进程。 |
 | `ctx.storage` | `seam` | [`storage`](../packages/storage/storage) | [`storage-json`](../packages/storage/storage-json), [`storage-sqlite`](../packages/storage/storage-sqlite) | [`storage-domain`](../packages/storage/storage-domain) | - | 各后端以不同名称并列注册；数据形态（领域优先）挂载到枢纽上，并将类型化操作转换为不透明的 KV 单元原语。 |
 | `ctx.storageDomain` | `core` | [`storage-domain`](../packages/storage/storage-domain) | - | [`workspace`](../packages/workspace/workspace), [`message-feedback`](../packages/feedback/message-feedback) | - | 等待所有已配置后端就绪，然后将领域形态发布为一个受生命周期约束的服务，用于类型化持久状态。 |

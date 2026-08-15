@@ -53,7 +53,7 @@ The shell ships the real Tauri updater: `/api/desktop/update` runs a live check 
 
 Build and sign with `node scripts/build-and-sign.mjs`: it runs `tauri build --bundles nsis` with `createUpdaterArtifacts` enabled, signs the installer with the local minisign key (`updater.key`, gitignored — the private key never leaves the build machine; the public key is embedded in `tauri.conf.json`), and assembles `update-manifest.json` (version, notes, pub_date, per-platform signature and download URL). `UPDATE_VERSION_OVERRIDE` writes a bumped manifest version for exercising the update flow locally, and `UPDATE_MANIFEST_BASE_URL` overrides the artifact URL.
 
-Authenticode code signing of the installer itself is out of scope for this milestone (it needs the publisher's own certificate); the updater's artifact signature is the minisign chain above.
+The installer's own Authenticode signature rides the same script: with `AUTHENTICODE_CERT` (a .pfx path) and `AUTHENTICODE_PASSWORD` set, the build points `bundle.windows.signCommand` at `scripts/sign-windows.mjs` (the signtool invocation; `AUTHENTICODE_SIGNTOOL` overrides the lookup with the full SDK bin path, `AUTHENTICODE_TIMESTAMP_URL` the timestamping server). tauri Authenticode-signs the installer before computing the minisign updater artifacts, so the `.sig` covers the signed installer. Without a certificate the build still succeeds, ships an unsigned installer, and says so; the publisher certificate stays with the release owner.
 
 ## Bridge contract (host -> shell primitives)
 
@@ -67,6 +67,7 @@ Every request carries the header `x-dsh-bridge-token` with the run-scoped token;
 | `/api/desktop/windows/open` | POST | `{ sessionId? }` opens one new window (the id must be safe) and registers it; `{ label, sessionId }` |
 | `/api/desktop/windows/close` | POST | `{ label }` closes the window — the main window hides instead; `{ closed: true }` or 404 |
 | `/api/desktop/windows/focus` | POST | `{ label }` shows, unminimizes, and focuses; `{ focused: true }` or 404 |
+| `/api/desktop/windows/assign` | POST | `{ label, sessionId }` records the session one window currently shows (the client-reported half; the shell's own routed boot targets are the other); `{ assigned: true }`, 404 for an unknown label, or 400 for an unsafe id |
 | `/api/desktop/windows` | GET | `{ windows: [{ label, sessionId }] }` — the registry snapshot; `sessionId` is null without a target |
 | `/api/desktop/settings` | GET | `{ closeToTray, launchAtLogin }` — the shell settings document |
 | `/api/desktop/settings` | POST | partial document `{ closeToTray?, launchAtLogin? }`; OS side effects run before persistence; the complete updated document answers |
@@ -81,10 +82,9 @@ The shell persists `closeToTray` (default true — closing the main window hides
 
 ## Known Limitations and Deferred Work
 
-- **Authenticode not signed** — the NSIS installer itself carries no publisher certificate; only the updater artifacts are minisign-signed. Publisher signing needs the release owner's certificate.
+- **Authenticode certificate unset** — the signing toolchain is in place (the `AUTHENTICODE_*` variables above), but the publisher certificate stays with the release owner; without one the build ships an unsigned installer.
 - **Dev self-hosted updates only** — the updater endpoint and artifact URL point at the shell's own loopback bridge; a production deployment must host the manifest and installer on HTTPS and rotate the signing key.
 - **GNU toolchain untested** — developed for the MSVC host; the GNU linker may need extra setup.
-- **Shell tracks shell-initiated navigation only** — the window registry knows which session each window was routed to; sessions the operator opens through the web GUI sidebar are not tracked, so a deep link to such a session opens a new window instead of focusing the one showing it. A client-to-shell feedback channel refines this.
-- **Settings UI is shell-native, launchAtLogin is Windows-only** — the tray settings item opens the bundled settings window; there is no settings page inside the web GUI yet, and the launch-at-login Run key exists only on Windows. macOS/Linux start-at-login waits for those platforms' milestones.
-- **Toast identity is PowerShell's** — Windows toasts activate correctly through the `dsh` protocol, but they display under Windows PowerShell's AppUserModelID until the installer milestone registers the shell's own AUMID shortcut.
+- **Toast identity falls back to PowerShell when AUMID registration fails** — the shell rewrites the Start Menu's `DeepSeek Harness.lnk` with its own AppUserModelID at every boot; registration failure logs at boot and toasts fall back to the old PowerShell identity.
+- **launchAtLogin is Windows-only** — the web GUI settings page and the shell-native settings window both read and write `closeToTray`/`launchAtLogin`, but the launch-at-login Run key exists only on Windows; macOS/Linux start-at-login waits for those platforms' milestones.
 - **macOS/Linux toast click-through** — only Windows toasts carry protocol activation today; the notification plugin offers no activation callback on the other platforms.

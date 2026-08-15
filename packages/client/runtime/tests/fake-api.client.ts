@@ -174,12 +174,26 @@ export class FakeApiClient implements IApiClient {
     interrupt: (payload: unknown) => this.record('subagent.interrupt', payload, this.onSubagentInterrupt(payload)),
   }
 
+  onReportWindow: (payload: unknown) => Promise<RpcResponse<{ reported: true }>>
+    = () => Promise.resolve(ok({ reported: true as const }))
+
   readonly host: IApiClient['host'] = {
     describe: (payload: unknown) => this.record('host.describe', payload, this.onDescribe(payload)),
     pickDirectory: (payload: unknown) => this.record('host.pickDirectory', payload, this.onPickDirectory(payload)),
     listDirectory: (payload: unknown) => this.record('host.listDirectory', payload, this.onListDirectory(payload)),
     createDirectory: (payload: unknown) => this.record('host.createDirectory', payload, this.onCreateDirectory(payload)),
     openPath: (payload: unknown) => this.record('host.openPath', payload, this.onOpenPath(payload)),
+    reportWindow: (payload: unknown) => this.record('host.reportWindow', payload, this.onReportWindow(payload)),
+  }
+
+  onDesktopGetSettings: (payload: unknown) => Promise<RpcResponse<{ closeToTray: boolean; launchAtLogin: boolean }>>
+    = () => Promise.resolve(ok({ closeToTray: true, launchAtLogin: false }))
+  onDesktopSetSettings: (payload: unknown) => Promise<RpcResponse<{ closeToTray: boolean; launchAtLogin: boolean }>>
+    = () => Promise.resolve(ok({ closeToTray: true, launchAtLogin: false }))
+
+  readonly desktop: IApiClient['desktop'] = {
+    getSettings: (payload: unknown) => this.record('desktop.getSettings', payload, this.onDesktopGetSettings(payload)),
+    setSettings: (payload: unknown) => this.record('desktop.setSettings', payload, this.onDesktopSetSettings(payload)),
   }
 
   // The archive-set field defaults at the binding below so list stubs keep

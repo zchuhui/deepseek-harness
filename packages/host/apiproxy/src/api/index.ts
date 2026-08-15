@@ -6,6 +6,7 @@
 
 import type { SessionsApi } from './sessions.ts'
 import type { HostApi } from './host.ts'
+import type { DesktopApi } from './desktop.ts'
 import type { WorkspaceApi } from './workspace.ts'
 import type { AgentPresetsApi } from './agent-presets.ts'
 import type { SkillsApi } from './skills.ts'
@@ -23,6 +24,7 @@ export interface ApiProxy {
   sessions: SessionsApi
   subagents: SubagentsApi
   host: HostApi
+  desktop: DesktopApi
   workspace: WorkspaceApi
   skills: SkillsApi
   agentPresets: AgentPresetsApi
@@ -48,6 +50,7 @@ export type {
   SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionsApi, SessionSummary,
 } from './sessions.ts'
 export type { DirectoryEntry, DirectoryListing, HostApi } from './host.ts'
+export type { DesktopApi } from './desktop.ts'
 export type {
   SubagentAddress, SubagentCatalog, SubagentInterruptReceipt, SubagentListEntry,
   SubagentPromptReceipt, SubagentsApi,

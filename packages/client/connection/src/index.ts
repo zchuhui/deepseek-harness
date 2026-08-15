@@ -107,6 +107,12 @@ const PRIVILEGED_METHODS = new Set([
   'agentPreset.remove',
   'host.pickDirectory',
   'host.openPath',
+  // Reporting a window's session and reading/writing the shell settings both
+  // act on the host's desktop shell (native windows / system settings), like
+  // host.pickDirectory.
+  'host.reportWindow',
+  'desktop.getSettings',
+  'desktop.setSettings',
   'settings.describe',
   'settings.openDocument',
   'settings.update',
