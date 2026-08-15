@@ -32,9 +32,8 @@ cargo test
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DSH_DESKTOP_PORT` | `3080` | Local dsh web port |
-| `DSH_DESKTOP_COMMAND` | none | Full launch command override (whitespace-split) |
-| `DSH_DESKTOP_BRIDGE_PORT` | `3901` | Bridge HTTP port |
+| `DSH_DESKTOP_PORT` | `3080` in debug builds | Local dsh web port; release builds allocate a fresh loopback port |
+| `DSH_DESKTOP_COMMAND` | none | Debug-only full launch command override (whitespace-split) |
 
 The shell exports `DSH_DESKTOP_BRIDGE_URL` and `DSH_DESKTOP_BRIDGE_TOKEN` to the spawned dsh child, so host-side providers can call the bridge.
 

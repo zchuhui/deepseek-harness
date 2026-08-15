@@ -1,0 +1,117 @@
+name: desktop release
+
+on:
+  pull_request:
+    paths:
+      - 'desktop-app/**'
+      - 'packages/bundle/web-app/**'
+      - '.github/workflows/desktop-release.yml'
+  push:
+    tags: ['desktop-v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  desktop-windows:
+    name: desktop Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 45
+    environment: ${{ startsWith(github.ref, 'refs/tags/desktop-v') && 'desktop-release' || '' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - name: Install and build dsh runtime
+        shell: pwsh
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Fetch pinned Node runtime
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'node.zip'
+          Invoke-WebRequest https://nodejs.org/dist/v22.19.0/node-v22.19.0-win-x64.zip -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '${{ vars.DSH_NODE_22_19_0_WIN_X64_SHA256 }}'.ToLowerInvariant()) { throw 'Node runtime archive checksum mismatch' }
+          Expand-Archive $archive -DestinationPath $env:RUNNER_TEMP
+          $node = Get-ChildItem $env:RUNNER_TEMP -Recurse -Filter node.exe | Select-Object -First 1 -ExpandProperty FullName
+          "NODE_RUNTIME_EXE=$node" >> $env:GITHUB_ENV
+          "NODE_RUNTIME_SHA256=$((Get-FileHash $node -Algorithm SHA256).Hash.ToLowerInvariant())" >> $env:GITHUB_ENV
+      - name: Test Rust shell
+        shell: pwsh
+        working-directory: desktop-app/src-tauri
+        run: |
+          $env:CARGO_TARGET_DIR = 'target-ci'
+          cargo test --locked
+      - name: Build installer and updater artifact
+        shell: pwsh
+        working-directory: desktop-app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm run build:release
+      - name: Authenticode-sign the installer
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: azure/trusted-signing-action@v0
+        with:
+          endpoint: ${{ vars.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_TRUSTED_SIGNING_PROFILE }}
+          files-folder: desktop-app/src-tauri/target/release/bundle/nsis
+          files-folder-filter: '*-setup.exe'
+          file-digest: SHA256
+          timestamp-rfc3161: ${{ vars.AZURE_TRUSTED_SIGNING_TIMESTAMP_URL }}
+          timestamp-digest: SHA256
+      - name: Re-sign updater artifact after Authenticode
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: pwsh
+        working-directory: desktop-app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $installer = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1 -ExpandProperty FullName
+          & signtool verify /pa $installer
+          Remove-Item "$installer.sig" -ErrorAction SilentlyContinue
+          pnpm tauri signer sign $installer
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $manifest = [ordered]@{
+            version = $version
+            notes = "DeepSeek Harness $version"
+            pub_date = (Get-Date).ToUniversalTime().ToString('o')
+            platforms = @{
+              'windows-x86_64' = @{
+                signature = (Get-Content "$installer.sig" -Raw).Trim()
+                url = "https://github.com/deepseek-ai/deepseek-harness/releases/download/desktop-v$version/$($installer | Split-Path -Leaf)"
+              }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content update-manifest.json
+      - name: Produce SBOM and checksums
+        uses: anchore/sbom-action@v0
+        with:
+          path: desktop-app/src-tauri/target/release/bundle/nsis
+          artifact-name: dsh-desktop-sbom
+      - name: Upload pull request artifacts
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-desktop-windows-x64
+          path: |
+            desktop-app/src-tauri/target/release/bundle/nsis/*
+            desktop-app/update-manifest.json
+      - name: Publish signed release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          Get-FileHash desktop-app/src-tauri/target/release/bundle/nsis/*-setup.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLowerInvariant())  $($_.Path | Split-Path -Leaf)" } | Set-Content desktop-app/SHA256SUMS.txt
+          gh release create $tag desktop-app/src-tauri/target/release/bundle/nsis/* desktop-app/update-manifest.json desktop-app/SHA256SUMS.txt --generate-notes

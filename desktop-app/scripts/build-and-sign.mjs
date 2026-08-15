@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url'
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const conf = JSON.parse(readFileSync(join(root, 'src-tauri', 'tauri.conf.json'), 'utf8'))
 const env = { ...process.env }
+execFileSync('pnpm', ['run', 'stage-runtime'], { cwd: root, env, stdio: 'inherit', shell: process.platform === 'win32' })
 // The tauri CLI shells out to cargo; sessions started before the Rust install
 // lack ~/.cargo/bin on PATH.
 const cargoBin = join(env.USERPROFILE ?? '', '.cargo', 'bin')
@@ -69,8 +70,9 @@ const sigPath = setupPath + '.sig'
 if (!existsSync(sigPath)) throw new Error('signed artifact (.sig) missing; enable createUpdaterArtifacts and the signing env')
 copyFileSync(setupPath, join(root, 'update-artifact.exe'))
 const signature = readFileSync(sigPath, 'utf8').trim()
-const base = env.UPDATE_MANIFEST_BASE_URL ?? 'http://127.0.0.1:3901/update-artifact'
 const version = env.UPDATE_VERSION_OVERRIDE ?? conf.version
+const base = env.UPDATE_MANIFEST_BASE_URL
+  ?? `https://github.com/deepseek-ai/deepseek-harness/releases/download/desktop-v${version}/${encodeURIComponent(setup)}`
 const manifest = {
   version,
   notes: 'Developer milestone update',

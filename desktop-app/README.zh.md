@@ -32,9 +32,8 @@ cargo test
 
 | 变量 | 默认值 | 含义 |
 |---|---|---|
-| `DSH_DESKTOP_PORT` | `3080` | 本地 dsh web 端口 |
-| `DSH_DESKTOP_COMMAND` | 无 | 完整启动命令覆盖(按空白切分) |
-| `DSH_DESKTOP_BRIDGE_PORT` | `3901` | 桥接 HTTP 端口 |
+| `DSH_DESKTOP_PORT` | 调试构建中为 `3080` | 本地 dsh web 端口；发布构建分配新的 loopback 端口 |
+| `DSH_DESKTOP_COMMAND` | 无 | 仅调试构建使用的完整启动命令覆盖(按空白切分) |
 
 壳向拉起的 dsh 子进程导出 `DSH_DESKTOP_BRIDGE_URL` 与 `DSH_DESKTOP_BRIDGE_TOKEN`,宿主侧 provider 据此调用桥接。
 

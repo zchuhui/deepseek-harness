@@ -2,6 +2,8 @@ node_modules/
 src-tauri/target/
 src-tauri/target-*/
 src-tauri/gen/
+resources/runtime/*
+!resources/runtime/.gitkeep
 *.log
 # Updater signing secrets: the private key never leaves the build machine.
 updater.key

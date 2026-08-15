@@ -1,10 +1,10 @@
-//! Runtime Manager: finds an executable dsh, reuses an already-running
-//! local web service, or spawns and readiness-polls one. Mirrors the
-//! scripts/desktop-launch/launch.ps1 discovery rules in Rust.
+//! Runtime Manager: resolves a development or bundled dsh executable, starts
+//! it on a shell-owned loopback port, and waits for its nonce-authenticated
+//! readiness response.
 
 use std::fs::File;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -18,6 +18,17 @@ pub const ENV_COMMAND_OVERRIDE: &str = "DSH_DESKTOP_COMMAND";
 pub const ENV_PORT: &str = "DSH_DESKTOP_PORT";
 /** Default web port. */
 pub const DEFAULT_PORT: u16 = 3080;
+/** Environment nonce that authenticates the desktop-only readiness route. */
+pub const ENV_WEB_TOKEN: &str = "DSH_DESKTOP_WEB_TOKEN";
+
+/** Choose an unused loopback port for one shell boot attempt. */
+pub fn allocate_loopback_port() -> Result<u16, String> {
+    TcpListener::bind(("127.0.0.1", 0))
+        .map_err(|error| format!("allocate loopback port failed: {error}"))?
+        .local_addr()
+        .map(|address| address.port())
+        .map_err(|error| format!("read allocated loopback port failed: {error}"))
+}
 
 /** One resolved launch command: program, argv, and working directory. */
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,13 +36,6 @@ pub struct LaunchSpec {
     pub program: String,
     pub args: Vec<String>,
     pub cwd: PathBuf,
-}
-
-/** Whether the shell reused a live service or spawned a fresh one. */
-#[derive(Debug, PartialEq, Eq)]
-pub enum StartOutcome {
-    Reused,
-    Spawned,
 }
 
 /**
@@ -120,6 +124,33 @@ pub fn resolve_launch_spec(port: u16, start: &Path) -> Result<LaunchSpec, String
     })
 }
 
+/** Resolve the installed application's bundled Node and dsh CLI. */
+pub fn resolve_bundled_launch_spec(port: u16, resource_dir: &Path) -> Result<LaunchSpec, String> {
+    let runtime = resource_dir.join("runtime");
+    let node = runtime.join("node.exe");
+    let cli = runtime
+        .join("node_modules")
+        .join("@deepseek-ai")
+        .join("dsh")
+        .join("lib")
+        .join("bin.js");
+    if !node.is_file() || !cli.is_file() {
+        return Err("desktop runtime is incomplete; reinstall DeepSeek Harness".to_string());
+    }
+    Ok(LaunchSpec {
+        program: node.to_string_lossy().into_owned(),
+        args: vec![
+            cli.to_string_lossy().into_owned(),
+            "web".to_string(),
+            "--host".to_string(),
+            "127.0.0.1".to_string(),
+            "--port".to_string(),
+            port.to_string(),
+        ],
+        cwd: runtime,
+    })
+}
+
 /** Whether an executable named name is found on PATH. */
 fn which(name: &str) -> Option<PathBuf> {
     let path_var = std::env::var_os("PATH")?;
@@ -180,6 +211,28 @@ pub fn http_any_response(port: u16) -> bool {
     false
 }
 
+/** Verify the desktop runtime's nonce-protected readiness response. */
+pub fn http_desktop_ready(port: u16, token: &str) -> bool {
+    let mut stream = match TcpStream::connect_timeout(
+        &format!("127.0.0.1:{port}")
+            .parse()
+            .expect("loopback address parses"),
+        Duration::from_secs(2),
+    ) {
+        Ok(stream) => stream,
+        Err(_) => return false,
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    let request = format!(
+        "GET /internal/desktop/ready HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-DSH-Desktop-Token: {token}\r\nConnection: close\r\n\r\n"
+    );
+    if stream.write_all(request.as_bytes()).is_err() {
+        return false;
+    }
+    let mut response = String::new();
+    stream.read_to_string(&mut response).is_ok() && response.starts_with("HTTP/1.1 204")
+}
+
 /**
  * The local dsh web runtime. Spawned children are killed (tree) on drop;
  * a reused service is left untouched.
@@ -205,16 +258,13 @@ impl RuntimeManager {
     }
 
     /**
-     * Reuse a live service, or spawn and readiness-poll a fresh one.
+     * Start a fresh service and readiness-poll it.
      * @param extra_env - environment entries added to the spawned child.
-     * @returns the outcome, or an error naming the failing step.
+     * @returns the spawned outcome, or an error naming the failing step.
      */
-    pub fn start(&mut self, extra_env: &[(&str, &str)]) -> Result<StartOutcome, String> {
+    pub fn start(&mut self, extra_env: &[(&str, &str)]) -> Result<(), String> {
         if tcp_connect_ok(self.port) {
-            if http_any_response(self.port) {
-                return Ok(StartOutcome::Reused);
-            }
-            return Err(format!("端口 {} 被占用且无 dsh 响应", self.port));
+            return Err(format!("port {} is already occupied", self.port));
         }
         let mut command = Command::new(&self.spec.program);
         command
@@ -236,9 +286,14 @@ impl RuntimeManager {
             if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
                 return Err(format!("dsh 运行时在就绪前退出(退出码 {status})"));
             }
-            if http_any_response(self.port) {
+            let ready = extra_env
+                .iter()
+                .find(|(key, _)| *key == ENV_WEB_TOKEN)
+                .map(|(_, token)| http_desktop_ready(self.port, token))
+                .unwrap_or_else(|| http_any_response(self.port));
+            if ready {
                 self.child = Some(child);
-                return Ok(StartOutcome::Spawned);
+                return Ok(());
             }
             std::thread::sleep(Duration::from_secs(1));
         }
@@ -337,35 +392,19 @@ mod tests {
     }
 
     #[test]
-    fn start_reuses_a_live_http_service() {
-        use std::sync::atomic::{AtomicBool, Ordering};
-        use std::sync::Arc;
+    fn readiness_probe_requires_the_nonce_and_status() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
-        let server = listener.try_clone().unwrap();
-        let stop = Arc::new(AtomicBool::new(false));
-        let stop_flag = Arc::clone(&stop);
         let handle = std::thread::spawn(move || {
-            server.set_nonblocking(true).unwrap();
-            while !stop_flag.load(Ordering::Relaxed) {
-                match server.accept() {
-                    Ok((mut stream, _)) => {
-                        let mut request = [0u8; 256];
-                        let _ = stream.read(&mut request);
-                        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-                    }
-                    Err(_) => std::thread::sleep(Duration::from_millis(10)),
-                }
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut request = [0_u8; 512];
+                let size = stream.read(&mut request).unwrap_or(0);
+                let request = String::from_utf8_lossy(&request[..size]);
+                assert!(request.contains("X-DSH-Desktop-Token: ready-token"));
+                let _ = stream.write_all(b"HTTP/1.1 204 No Content\r\n\r\n");
             }
         });
-        let spec = LaunchSpec {
-            program: "node".into(),
-            args: vec!["--version".into()],
-            cwd: temp_dir("reuse"),
-        };
-        let mut manager = RuntimeManager::new(port, spec);
-        assert_eq!(manager.start(&[]), Ok(StartOutcome::Reused));
-        stop.store(true, Ordering::Relaxed);
+        assert!(http_desktop_ready(port, "ready-token"));
         handle.join().unwrap();
     }
 
@@ -380,5 +419,17 @@ mod tests {
         };
         let mut manager = RuntimeManager::new(port, spec);
         assert!(manager.start(&[]).is_err());
+    }
+
+    #[test]
+    fn allocates_a_nonzero_loopback_port() {
+        assert_ne!(0, allocate_loopback_port().unwrap());
+    }
+
+    #[test]
+    fn bundled_spec_refuses_an_incomplete_runtime() {
+        let root = temp_dir("bundled-runtime");
+        assert!(resolve_bundled_launch_spec(3100, &root).is_err());
+        let _ = std::fs::remove_dir_all(root);
     }
 }

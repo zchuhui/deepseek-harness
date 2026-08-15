@@ -7,16 +7,29 @@
     "frontendDist": "../frontend-dist"
   },
   "app": {
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "windows": [],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
     "active": true,
     "targets": ["nsis"],
     "createUpdaterArtifacts": false,
+    "resources": {
+      "../resources/runtime": "runtime"
+    },
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": {
+        "type": "embedBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -33,7 +46,7 @@
     },
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdGOUNBMTc5MTkwMkY5N0YKUldSLytRSVplYUdjZjFWUUNBV04weXVycnBTSngxNHBSUXc2emlodXZqUTBCNC9qVms0YksxMnYK",
-      "endpoints": ["http://127.0.0.1:3901/update-manifest.json"],
+      "endpoints": ["https://github.com/deepseek-ai/deepseek-harness/releases/latest/download/update-manifest.json"],
       "windows": {
         "installMode": "passive"
       }
