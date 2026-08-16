@@ -2,7 +2,8 @@
  * LayoutController behavior: the cross-plugin panel-action face. Geometry
  * lives in the entry store (layout-store.spec.ts) — here we assert the
  * delegation contract: attachPanels wiring, the three actions forwarding, the
- * unwired fail-loud, and re-attach overwriting a stale action set.
+ * queued startup opening, the remaining unwired fail-loud actions, and
+ * re-attach overwriting a stale action set.
  */
 import { describe, expect, it, vi } from 'vitest'
 import { LayoutController } from '@deepseek-ai/dsh-client-ui-layout/src/client/service.ts'
@@ -36,10 +37,18 @@ describe('LayoutController', () => {
     expect(panels.setDetails).not.toHaveBeenCalled()
   })
 
-  it('fails loud before the root entry wired its actions', () => {
+  it('queues an early details opening until the root entry wires its actions', () => {
+    const service = new LayoutController()
+    service.openDetails()
+    const panels = fakePanels()
+    service.attachPanels(panels)
+
+    expect(panels.openDetails).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails loud before the root entry wired its other actions', () => {
     const service = new LayoutController()
     expect(() => { service.toggleSidebar() }).toThrow(/panel actions not wired/)
-    expect(() => { service.openDetails() }).toThrow(/panel actions not wired/)
     expect(() => { service.closeDetails() }).toThrow(/panel actions not wired/)
   })
 

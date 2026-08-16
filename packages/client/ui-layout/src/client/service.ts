@@ -32,6 +32,7 @@ export interface ILayout {
 /** Cross-plugin panel-action face (ctx.layout). */
 export class LayoutController implements ILayout {
   #panels: PanelActions | undefined
+  #openDetailsRequested = false
 
   /**
    * Adopt the root entry's bound store actions. Called from the root
@@ -42,6 +43,10 @@ export class LayoutController implements ILayout {
    */
   attachPanels(actions: PanelActions): void {
     this.#panels = actions
+    if (this.#openDetailsRequested) {
+      this.#openDetailsRequested = false
+      actions.openDetails()
+    }
   }
 
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
@@ -51,7 +56,15 @@ export class LayoutController implements ILayout {
 
   /** Open the details panel (no-op when already open). */
   openDetails(): void {
-    this.#require().openDetails()
+    // Optional Client plugins may contribute a detail-column tab while the
+    // root entry is still starting. Preserve that opening request until the
+    // root entry supplies its store actions instead of making load order part
+    // of every plugin's public behavior.
+    if (this.#panels === undefined) {
+      this.#openDetailsRequested = true
+      return
+    }
+    this.#panels.openDetails()
   }
 
   /** Close the details panel. */

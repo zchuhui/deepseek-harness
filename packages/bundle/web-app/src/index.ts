@@ -72,7 +72,11 @@ export const DSH_DESKTOP_WEB_TOKEN = 'DSH_DESKTOP_WEB_TOKEN' as const
 /** CSP injected into the desktop-served index; native IPC stays unavailable to this page. */
 const DESKTOP_CSP = "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:"
 
-/** Add the desktop CSP before the document's closing head tag. */
+/**
+ * Add the desktop CSP before the document's closing head tag.
+ * @param html - Served index document, with or without a closing head tag.
+ * @returns the document with the desktop CSP meta tag injected.
+ */
 export function addDesktopCsp(html: string): string {
   const tag = `<meta http-equiv="Content-Security-Policy" content="${DESKTOP_CSP}">`
   return html.includes('</head>') ? html.replace('</head>', `${tag}</head>`) : `${tag}${html}`

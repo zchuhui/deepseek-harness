@@ -2922,7 +2922,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/updater/updater-desktop/src/index.ts:16`](../packages/updater/updater-desktop/src/index.ts)
+Source: [`packages/updater/updater-desktop/src/index.ts:17`](../packages/updater/updater-desktop/src/index.ts)
 
 <a id="deepseek-aidsh-updater-manual"></a>
 
@@ -3149,6 +3149,38 @@ export interface Config {
 
 Source: [`packages/workflow/workflow-worker-thread/src/index.ts:32`](../packages/workflow/workflow-worker-thread/src/index.ts)
 
+<a id="deepseek-aidsh-workspace-notes"></a>
+
+## `@deepseek-ai/dsh-workspace-notes`
+
+Requires: `storageDomain` · `workspaceRegistry`
+
+```ts config-catalog
+/** Required deployment policy for workspace notes. */
+export interface Config {
+  /** Maximum UTF-8 byte length accepted for one note's content. */
+  readonly maxContentBytes: number
+}
+```
+
+Source: [`packages/workspace/workspace-notes/src/index.ts:47`](../packages/workspace/workspace-notes/src/index.ts)
+
+<a id="deepseek-aidsh-workspace-todos"></a>
+
+## `@deepseek-ai/dsh-workspace-todos`
+
+Requires: `storageDomain` · `workspaceRegistry`
+
+```ts config-catalog
+/** Required deployment policy for shared todos. */
+export interface Config {
+  /** Maximum UTF-8 byte length accepted for one todo's single-line content. */
+  readonly maxContentBytes: number
+}
+```
+
+Source: [`packages/workspace/workspace-todos/src/index.ts:54`](../packages/workspace/workspace-todos/src/index.ts)
+
 ## Loadable plugins with no config
 
 These load from a `cordis.yml` entry with no `config:` block; they declare no configuration API.
@@ -3189,6 +3221,8 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-user-questions` ([`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workflow-run` ([`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-workspace` ([`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-workspace-notes` ([`packages/client/ui-workspace-notes/src/index.ts`](../packages/client/ui-workspace-notes/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-workspace-todos` ([`packages/client/ui-workspace-todos/src/index.ts`](../packages/client/ui-workspace-todos/src/index.ts))
 - `@deepseek-ai/dsh-command-compact` — requires `commands` · `compaction` ([`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts))
 - `@deepseek-ai/dsh-command-feedback` — requires `commands` ([`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts))
 - `@deepseek-ai/dsh-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))

@@ -24,7 +24,7 @@
 
 import { createRequire } from 'node:module'
 import {
-  existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, unlinkSync, writeFileSync,
+  existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, realpathSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import type { EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
@@ -203,34 +203,43 @@ function ensureSymlink(link: string, target: string): void {
 
 /**
  * Maintain the flat module fallback `$DSH_HOME/profiles/node_modules`: one
- * symlink per package in the dsh app's resolvable dependency CLOSURE (BFS
- * over `dependencies` from the app manifest), each resolved from its own
- * real location. Node's parent-directory walk from any profile finds this
- * directory after the profile's own `node_modules`, so every in-box plugin
- * resolves without pnpm ever managing it — the exact "bundles come from the
- * installation" contract. The closure (not just direct dependencies) is
- * required for out-of-tree plugins: their peer dependencies name Service
- * Definition packages (`dsh-compaction`, `dsh-invariants`, ...) that the app
- * reaches only through its Service Provider packages. Symlinked packages
- * resolve their own dependencies from their real directories (Node's default
- * symlink-following), so each package needs only its one flat link.
+ * symlink per package in the dsh app's and configured bundle's resolvable
+ * dependency CLOSURE (BFS over their `dependencies` and `peerDependencies`),
+ * each resolved from its own real location. Node's parent-directory walk from
+ * any profile finds this directory after the profile's own `node_modules`, so
+ * every in-box plugin resolves without pnpm ever managing it, while a linked
+ * source bundle contributes the same closure as its packed release. The
+ * closure (not just direct dependencies) is required for out-of-tree plugins:
+ * their peer dependencies name Service Definition packages (`dsh-compaction`,
+ * `dsh-invariants`, ...) that the app reaches only through its Service Provider
+ * packages. Symlinked packages resolve their own dependencies from their real
+ * directories (Node's default symlink-following), so each package needs only
+ * its one flat link.
  * Idempotent: correct links are kept and moved installations are
  * re-pointed; a stale link to a vanished package stays until its name is
  * reused (dangling links are invisible to resolution).
  * @param installAnchor - absolute path of the dsh app's package.json.
  * @param home - the Harness home; defaults to {@link resolveDshHome}.
+ * @param bundleAnchors - package manifests of bundles resolved for the profile.
  */
-export function healProfilesModuleFallback(installAnchor: string, home: string = resolveDshHome()): void {
+export function healProfilesModuleFallback(
+  installAnchor: string,
+  home: string = resolveDshHome(),
+  bundleAnchors: readonly string[] = [],
+): void {
   const profilesDir = join(home, PROFILES_DIR)
   const modulesDir = join(profilesDir, 'node_modules')
   mkdirSync(modulesDir, { recursive: true })
-  const appManifest = JSON.parse(readFileSync(installAnchor, 'utf8')) as ProfileManifest
+  const anchors = [installAnchor, ...bundleAnchors.map(anchor => realpathSync(anchor))]
   const links = new Map<string, string>()
-  /* v8 ignore next -- a real app manifest always declares its name */
-  if (appManifest.name !== undefined) links.set(appManifest.name, dirname(installAnchor))
   // BFS over the resolvable dependency graph; the visited set is the link
   // map itself (first resolution wins, matching Node's own nearest-wins).
-  const queue: { anchor: string; manifest: ProfileManifest }[] = [{ anchor: installAnchor, manifest: appManifest }]
+  const queue: { anchor: string; manifest: ProfileManifest }[] = anchors.map((anchor) => {
+    const manifest = JSON.parse(readFileSync(anchor, 'utf8')) as ProfileManifest
+    /* v8 ignore next -- every resolved app or bundle package declares its name */
+    if (manifest.name !== undefined) links.set(manifest.name, dirname(anchor))
+    return { anchor, manifest }
+  })
   for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
     // Peer dependencies participate: Service Definition packages (dsh-subprocess,
     // dsh-compaction, ...) are peers of their implementations, never plain

@@ -21,6 +21,7 @@ import type { createChatStore } from '../stores.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
 import type { CallId, SelectionTarget, ViewTab } from './views.ts'
+import type { WorkbenchState, WorkbenchTab } from './workbench.ts'
 
 /** Browser-owned image that has not crossed the durable host boundary. */
 export interface ComposerAttachment {
@@ -130,6 +131,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * zero owner changes.
      */
     'conversation.composer': { kind: 'chain'; scope: 'session'; owner: ComposerChainProps }
+    /**
+     * The details column's tab strip: one entry per workspace-level workbench
+     * tab beside the built-in Details tab. The declaring entry (this
+     * package's details registration) renders the built-in Details pane
+     * itself and joins these entries into one strip; entries render their
+     * pane only while active. Root scope: tabs address the selected
+     * workspace, not a session — an entry must not assume one exists.
+     */
+    'conversation.workbench.tab': { kind: 'list'; scope: 'root'; owner: WorkbenchTabOwnerProps }
     /**
      * The hero-phase Workspace picker hole: rendered by ConversationRoot
      * while the session is blank (picking another workspace switches to that
@@ -338,6 +348,10 @@ export interface TurnTailOwnerProps {
 export interface AssistantActionOwnerProps {
   /** Stable identity carried from the `assistant/message` event. */
   messageId: MessageId
+  /** Persisted event seq of the addressed message; provenance for note sources. */
+  seq: number
+  /** The message's plain text (assistant blocks flattened); note-copy material. */
+  text: string
 }
 
 /** Hook constrained to business data published on the current Chat Node's Turn. */
@@ -376,6 +390,20 @@ export interface DetailsToolOwnerProps {
   block: ToolCallBlock
   /** Session workspace root for card cwd and relative-path display. */
   cwd?: string | undefined
+}
+
+/**
+ * Owner currency of one workbench tab: the workspace the tab family addresses
+ * plus the shared tab-selection state. Everything session-specific stays out
+ * — root-scope entries must render without a session.
+ */
+export interface WorkbenchTabOwnerProps {
+  /** Workspace of the current session; entries scope their data by it. */
+  workspaceId: WorkspaceId | undefined
+  /** Active workbench tab id ('details' or a tab entry id). */
+  activeTabId: string
+  /** Switch the active workbench tab (records the workspace's last selection). */
+  selectTab: (tabId: string) => void
 }
 
 /**
@@ -717,6 +745,8 @@ export type ChatViewSlotProps =
  * the shared chat store, but its close button is a layout orchestration call.
  */
 export interface DetailsInjected {
+  /** Open the details panel (layout geometry stays with ctx.layout). */
+  openDetails: () => void
   /** Close the details panel (layout geometry stays with ctx.layout). */
   closeDetails: () => void
 }
@@ -724,6 +754,28 @@ export interface DetailsInjected {
 /** Full details-slot props: selection store, Tool output seat, injected close callback, and locale. */
 export type DetailsSlotProps = PropsRuntime<'details'> & PropsRenderSlots<'conversation.details.tool'>
   & PropsStore<ChatStore> & DetailsInjected & PropsLocale<'conversation'>
+
+/**
+ * Injected share of the workbench host (the details column's tab owner):
+ * the tab ledger plus the per-workspace tab memory and its write callback.
+ */
+export interface WorkbenchInjected extends DetailsInjected {
+  /** Tabs projected from the 'conversation.workbench.tab' slot ledger (views twin). */
+  tabs: {
+    list: () => readonly WorkbenchTab[]
+    subscribe: (fn: () => void) => () => void
+    version: () => number
+  }
+  /** Per-workspace last-selected tab (bound as the useWorkbench selector hook). */
+  hooks: { workbench: ObservableSnapshot<WorkbenchState> }
+  /** Record the workspace's last-selected workbench tab. */
+  selectTab: (workspaceId: WorkspaceId | undefined, tabId: string) => void
+}
+
+/** Full workbench-host props: details shares plus the workbench tab seat, ledger, memory, and locale. */
+export type WorkbenchSlotProps = PropsRuntime<'details'>
+  & PropsRenderSlots<'conversation.details.tool' | 'conversation.workbench.tab'>
+  & PropsStore<ChatStore> & InjectFace<WorkbenchInjected> & PropsLocale<'conversation'>
 
 /** Owner share common to the hero / New-Session Workspace pickers. */
 export interface EmptyWorkspaceOwnerProps {

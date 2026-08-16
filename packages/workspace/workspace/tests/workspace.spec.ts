@@ -320,6 +320,31 @@ describe('WorkspaceRegistry lifecycle and bootstrap', () => {
     expect(result.registry.list().some(workspace => workspace.path === drifted)).toBe(false)
   })
 
+  it('resolves the workspace owning a session by header-validated membership', async () => {
+    const owned = await makeDir('resolve-owned')
+    const prior = await makeDir('resolve-prior')
+    const drifted = await makeDir('resolve-drifted')
+    const ownedId = WorkspaceId('00000000-0000-4000-8000-000000000020')
+    const priorId = WorkspaceId('00000000-0000-4000-8000-000000000021')
+    const pool = storedPool(
+      [
+        [ownedId, record(owned, ['live'], '2026-07-24T00:00:00.000Z')],
+        [priorId, record(prior, ['drift'], '2026-07-23T00:00:00.000Z')],
+      ],
+      { initialized: true, workspaceIds: [ownedId, priorId] },
+    )
+    const result = await harness({
+      pool,
+      sessions: [header('live', owned, 200), header('drift', drifted, 300)],
+    })
+
+    expect(result.registry.resolveBySession(SessionId('live'))?.id).toBe(ownedId)
+    // 'drift' stays on `prior`'s durable account, but its header cwd no longer
+    // matches that path, so validated membership — and resolution — drop it.
+    expect(result.registry.resolveBySession(SessionId('drift'))).toBeUndefined()
+    expect(result.registry.resolveBySession(SessionId('never-seen'))).toBeUndefined()
+  })
+
   it('orders headerless partial records by prior order, then stable id', async () => {
     const first = await makeDir('fallback-first')
     const second = await makeDir('fallback-second')

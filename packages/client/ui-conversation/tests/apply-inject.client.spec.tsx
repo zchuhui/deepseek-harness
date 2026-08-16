@@ -18,11 +18,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SessionBehaviorOverrides } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import type { ISession, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ISession, SessionId, WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
   ChatViewInjected, ComposerBarInjected, ConversationInjected, ConversationSessionHeaderInjected,
-  ConversationSessionInjected, DetailsInjected,
+  ConversationSessionInjected, WorkbenchInjected,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { createChatStore } from '../src/client/stores.ts'
 
@@ -31,6 +31,7 @@ import type { createChatStore } from '../src/client/stores.ts'
 usePinnedBrowserLanguages('zh-CN')
 
 const ROOT = 'root-1' as SessionId
+const WID = 'w1' as WorkspaceId
 
 type ChatInstance = ReturnType<ReturnType<typeof createChatStore>['create']>
 type ChatActions = ChatInstance['actions']
@@ -336,13 +337,22 @@ describe('conversation slot inject API', () => {
 })
 
 describe('details inject API', () => {
-  it('details injects the one layout callback; selection rides the shared store instead', async () => {
+  it('details injects the workbench face; selection rides the shared store instead', async () => {
     const b = await bench()
     const entry = b.entryOf('details')
-    const injected = (entry.inject as unknown as () => DetailsInjected)()
-    expect(Object.keys(injected)).toEqual(['closeDetails'])
+    const injected = (entry.inject as unknown as () => WorkbenchInjected)()
+    expect(Object.keys(injected)).toEqual(['openDetails', 'closeDetails', 'tabs', 'hooks', 'selectTab'])
+    injected.openDetails()
+    expect(b.layoutFake.openDetails).toHaveBeenCalledTimes(1)
     injected.closeDetails()
     expect(b.layoutFake.closeDetails).toHaveBeenCalledTimes(1)
+    // The tab ledger projects external entries (none registered on this bench).
+    expect(injected.tabs.list()).toEqual([])
+    // The memory write lands in the injected hooks source and skips the
+    // no-workspace case (root-scope tabs may address none).
+    injected.selectTab(WID, 'notes')
+    injected.selectTab(undefined, 'notes')
+    expect(injected.hooks.workbench.getSnapshot().activeTab[WID]).toBe('notes')
     // The shared handle: details resolves the SAME instance conversation writes.
     const conv = b.runtime.storeOf('conversation.session', ROOT)
     const details = b.runtime.storeOf('details', ROOT)

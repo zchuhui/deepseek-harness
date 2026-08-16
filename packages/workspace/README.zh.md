@@ -7,6 +7,8 @@
 | 包 | 职责 | ctx 键 |
 |---|---|---|
 | [`workspace/`](workspace/README.md) | 注册 workspace 并记录其会话归属 | `ctx.workspaceRegistry` |
+| [`workspace-notes/`](workspace-notes/README.md) | 按工作区作用域的持久笔记，带修订号比较并设置 | `ctx.workspaceNotes` |
+| [`workspace-todos/`](workspace-todos/README.md) | 按工作区作用域的共享待办，带状态迁移校验与原子指派 | `ctx.workspaceTodos` |
 
 [workspace 包参考](workspace/README.md)负责生命周期、持久化和删除语义。
 

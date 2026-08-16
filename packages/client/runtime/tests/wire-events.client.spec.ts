@@ -132,4 +132,14 @@ describe('wire event bridge', () => {
     bench.sinks?.onConnected?.(description) // second generation after a reconnect
     expect(resets).toBe(2)
   })
+
+  it('broadcasts connection/reconnecting once per dead generation (stale marking)', async () => {
+    const bench = await mount()
+    let reconnecting = 0
+    bench.ctx.on('connection/reconnecting', () => { reconnecting++ })
+    bench.sinks?.onStateChange?.('reconnecting')
+    bench.sinks?.onStateChange?.('connected')
+    bench.sinks?.onStateChange?.('reconnecting')
+    expect(reconnecting).toBe(2)
+  })
 })

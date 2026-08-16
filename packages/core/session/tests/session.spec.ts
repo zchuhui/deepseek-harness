@@ -900,6 +900,17 @@ describe('Session', () => {
     expect(session.events).toEqual([])
   })
 
+  it('stamps ignorable on a log-only append via AppendEnvelopeOpts and defaults to required', () => {
+    const session = Session.create(SessionId('ignorable-append'))
+    const marked = session.append('todo/write', { todos: [] }, { ignorable: true })
+    expect(marked.ignorable).toBe(true)
+    expect(session.events[0]?.ignorable).toBe(true)
+
+    const required = session.append('todo/write', { todos: [] })
+    expect(required.ignorable).toBeUndefined()
+    expect(session.events[1]?.ignorable).toBeUndefined()
+  })
+
   it('deep-freezes seeded and appended event snapshots', () => {
     const seeded = Session.create(SessionId('seed-frozen'), [{
       type: 'turn/start',

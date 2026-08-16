@@ -149,6 +149,48 @@ abstract capability(): DirectoryPickerCapability
 
 Source: [`packages/host/directory-picker/src/index.ts:131`](../../packages/host/directory-picker/src/index.ts)
 
+<a id="ctxworkspacenotes--workspacenotesservice"></a>
+
+### `ctx.workspaceNotes` — `WorkspaceNotesService`
+
+Workspace-scoped notes service. It owns the `workspace-notes` storage domain, serializes each workspace's mutations, queues record cleanup when a workspace registration is deleted, and recovers interrupted cleanups on open. Disabling the plugin closes the domain without deleting it; reopening restores every still-registered workspace's notes.
+
+```ts cordis-catalog
+/**
+ * Read the ordered note view of one registered workspace.
+ * @param request - Workspace whose notes should be read.
+ * @returns the ordered immutable view or `unknown-workspace`.
+ */
+@Remote('list') list(request: WorkspaceNotesListRequest): Promise<WorkspaceNotesListResult>
+
+/**
+ * Create one note in a registered workspace at revision 1.
+ * @param request - owning workspace, validated content, visibility, and
+ * immutable provenance.
+ * @returns the committed note or an explicit business failure.
+ */
+@Remote('create') create(request: WorkspaceNotesCreateRequest): Promise<WorkspaceNotesCreateResult>
+
+/**
+ * Edit one note's content and/or Agent visibility against an observed
+ * revision. A matching no-op returns the stored note without changing its
+ * revision.
+ * @param request - target, observed revision, and desired fields.
+ * @returns the committed note or an explicit business failure.
+ */
+@Remote('update') update(request: WorkspaceNotesUpdateRequest): Promise<WorkspaceNotesUpdateResult>
+
+/**
+ * Delete one note against an observed revision. Absence is successful
+ * regardless of the supplied revision.
+ * @param request - target note and observed revision.
+ * @returns the stable absent postcondition, or an explicit failure.
+ */
+@Remote('delete') delete(request: WorkspaceNotesDeleteRequest): Promise<WorkspaceNotesDeleteResult>
+```
+
+Source: [`packages/workspace/workspace-notes/src/index.ts:110`](../../packages/workspace/workspace-notes/src/index.ts)
+
 <a id="ctxworkspaceregistry--workspaceregistry"></a>
 
 ### `ctx.workspaceRegistry` — `WorkspaceRegistry`
@@ -225,4 +267,114 @@ async resolveByPath(path: string): Promise<Workspace | undefined>
 Types: [SessionId](core.md)
 
 Source: [`packages/workspace/workspace/src/index.ts:92`](../../packages/workspace/workspace/src/index.ts)
+
+<a id="ctxworkspacetodos--workspacetodosservice"></a>
+
+### `ctx.workspaceTodos` — `WorkspaceTodosService`
+
+Workspace-scoped shared todos service. It owns the `workspace-todos` storage domain, serializes each workspace's mutations, validates the documented status transitions, commits assignments atomically, queues record cleanup when a workspace registration is deleted, and recovers interrupted cleanups on open. Disabling the plugin closes the domain without deleting it; reopening restores every still-registered workspace's todos.
+
+```ts cordis-catalog
+/**
+ * Read the ordered todo view of one registered workspace.
+ * @param request - Workspace whose todos should be read.
+ * @returns the ordered immutable view or `unknown-workspace`.
+ */
+@Remote('list') list(request: SharedTodosListRequest): Promise<SharedTodosListResult>
+
+/**
+ * Create one shared todo in a registered workspace at revision 1 in
+ * status `pending`.
+ * @param request - owning workspace, validated content, and immutable
+ * provenance.
+ * @returns the committed todo or an explicit business failure.
+ */
+@Remote('create') create(request: SharedTodosCreateRequest): Promise<SharedTodosCreateResult>
+
+/**
+ * Edit one shared todo's content against an observed revision. A matching
+ * no-op returns the stored todo without changing its revision.
+ * @param request - target, observed revision, and replacement content.
+ * @returns the committed todo or an explicit business failure.
+ */
+@Remote('updateContent') updateContent(request: SharedTodosUpdateContentRequest): Promise<SharedTodosUpdateContentResult>
+
+/**
+ * Move one shared todo to a requested status against an observed revision.
+ * The transition must be one of the documented allowed transitions; a
+ * request for the current status is a matching no-op.
+ * @param request - target, observed revision, and requested status.
+ * @returns the committed todo or an explicit business failure.
+ */
+@Remote('setStatus') setStatus(request: SharedTodosSetStatusRequest): Promise<SharedTodosSetStatusResult>
+
+/**
+ * Commit one assignment: `pending → in_progress` plus `assignedSessionId`
+ * in one atomic compare-and-set. Reassignment of a `pending` todo that
+ * carries an earlier assignment (for example after `completed → pending`)
+ * replaces that session id.
+ * @param request - target, observed revision, and addressed session.
+ * @returns the committed todo or an explicit business failure.
+ */
+@Remote('assign') assign(request: SharedTodosAssignRequest): Promise<SharedTodosAssignResult>
+
+/**
+ * Delete one shared todo against an observed revision. Absence is
+ * successful regardless of the supplied revision.
+ * @param request - target todo and observed revision.
+ * @returns the stable absent postcondition, or an explicit failure.
+ */
+@Remote('delete') delete(request: SharedTodosDeleteRequest): Promise<SharedTodosDeleteResult>
+```
+
+Source: [`packages/workspace/workspace-todos/src/index.ts:138`](../../packages/workspace/workspace-todos/src/index.ts)
+
+<a id="workspace-notes-events"></a>
+
+### `workspace-notes/*` events
+
+<a id="workspace-noteschanged--emit"></a>
+
+#### `workspace-notes/changed` — emit
+
+A workspace's notes view changed after a committed create, update, delete, or completed cleanup recovery. Emitted after the storage domain acknowledges durability and the per-workspace artifact-family revision advances; forwarded to consumers as the push invalidation signal.
+
+```ts cordis-catalog
+/**
+ * A workspace's notes view changed after a committed create, update,
+ * delete, or completed cleanup recovery. Emitted after the storage domain
+ * acknowledges durability and the per-workspace artifact-family revision
+ * advances; forwarded to consumers as the push invalidation signal.
+ * @param change - owning workspace and its new notes-family revision.
+ * @mode emit
+ */
+'workspace-notes/changed'(change: WorkspaceNotesChanged): void
+```
+
+Source: [`packages/workspace/workspace-notes/src/types.ts:217`](../../packages/workspace/workspace-notes/src/types.ts)
+
+<a id="workspace-todos-events"></a>
+
+### `workspace-todos/*` events
+
+<a id="workspace-todoschanged--emit"></a>
+
+#### `workspace-todos/changed` — emit
+
+A workspace's todos view changed after a committed create, content edit, status change, assignment, delete, or completed cleanup recovery. Emitted after the storage domain acknowledges durability and the per-workspace artifact-family revision advances; forwarded to consumers as the push invalidation signal.
+
+```ts cordis-catalog
+/**
+ * A workspace's todos view changed after a committed create, content
+ * edit, status change, assignment, delete, or completed cleanup
+ * recovery. Emitted after the storage domain acknowledges durability and
+ * the per-workspace artifact-family revision advances; forwarded to
+ * consumers as the push invalidation signal.
+ * @param change - owning workspace and its new todos-family revision.
+ * @mode emit
+ */
+'workspace-todos/changed'(change: SharedTodosChanged): void
+```
+
+Source: [`packages/workspace/workspace-todos/src/types.ts:289`](../../packages/workspace/workspace-todos/src/types.ts)
 <!-- END GENERATED cordis-surface -->

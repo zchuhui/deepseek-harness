@@ -11,13 +11,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ViewTab } from './contract/views.ts'
+import type { WorkbenchTab } from './contract/workbench.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected,
-  DetailsInjected,
+  WorkbenchInjected,
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
-import { createChatStore } from './stores.ts'
+import { createChatStore, createWorkbenchStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
@@ -34,7 +35,7 @@ import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { queueDockEntry } from './queue/QueueDock.tsx'
 import { ConversationRoot } from './skeleton/ConversationRoot.tsx'
 import { ConversationSession, ConversationSessionHeader } from './skeleton/ConversationSession.tsx'
-import { DetailsPanel } from './skeleton/DetailsPanel.tsx'
+import { Workbench } from './skeleton/Workbench.tsx'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { registerConversationNodes } from './conversation-nodes/register.ts'
 import { registerChatNodeRenderers } from './chat/register-node-renderers.ts'
@@ -164,6 +165,27 @@ export function apply(ctx: Context): void {
     subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
     version: () => slots.getVersion('conversation.view'),
   }
+
+  // The workbench tab ledger (views twin over the workbench slot). The
+  // built-in Details tab joins in the host itself, so this projects only
+  // external workspace-level entries.
+  const workbenchTabList = (): WorkbenchTab[] => {
+    const tabs: WorkbenchTab[] = []
+    for (const entry of slots.entries('conversation.workbench.tab')) {
+      /* v8 ignore next -- unreachable: list registration validates id at load. */
+      if (entry.options.id === undefined) continue
+      tabs.push({ id: entry.options.id, label: resolveSlotLabel(entry.options.label) ?? entry.options.id })
+    }
+    return tabs
+  }
+  const workbenchTabs = {
+    list: workbenchTabList,
+    subscribe: (fn: () => void) => slots.subscribe('conversation.workbench.tab', fn),
+    version: () => slots.getVersion('conversation.workbench.tab'),
+  }
+  // Root-lifetime per-workspace tab memory; writes flow through the injected
+  // selectTab callback only (the engine never reaches a component).
+  const workbenchStore = createWorkbenchStore()
 
   // The per-session input machine registry (SessionInputResolver face; published as
   // ctx.conversation.input by the service below sharing this one instance).
@@ -446,11 +468,20 @@ export function apply(ctx: Context): void {
     locale: NS,
     children: {
       'conversation.details.tool': { kind: 'single', scope: 'session' },
+      'conversation.workbench.tab': { kind: 'list', scope: 'root' },
     },
     store: chatStore,
-    inject: (): DetailsInjected => ({
+    inject: (): WorkbenchInjected => ({
+      openDetails: () => { layout.openDetails() },
       closeDetails: () => { layout.closeDetails() },
+      tabs: workbenchTabs,
+      hooks: { workbench: workbenchStore },
+      selectTab: (workspaceId, tabId) => {
+        workbenchStore.update((draft) => {
+          if (workspaceId !== undefined) draft.activeTab[workspaceId] = tabId
+        })
+      },
     }),
-  }, DetailsPanel)
+  }, Workbench)
 
 }
