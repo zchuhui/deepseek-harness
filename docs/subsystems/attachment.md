@@ -112,4 +112,38 @@ abstract readImage(ref: ImageAttachmentRef, signal?: AbortSignal): Promise<Store
 ```
 
 Source: [`packages/attachment/attachment/src/index.ts:29`](../../packages/attachment/attachment/src/index.ts)
+
+<a id="ctxfileattachments--fileattachmentstore-abstract-seam"></a>
+
+### `ctx.fileAttachments` — `FileAttachmentStore` (abstract seam)
+
+Immutable UTF-8 text-file attachment service. Implementations validate bytes before publishing a reference.
+
+```ts cordis-catalog
+/**
+ * Validate one UTF-8 text file without persisting it.
+ * Batch callers validate every member before saving any member.
+ * @param input - encoded bytes, declared media type, and optional display name.
+ * @returns completion after UTF-8 and media policy validation.
+ */
+abstract validateTextFile(input: SaveTextFileAttachment): Promise<void>
+
+/**
+ * Validate and durably commit one text file before its owning session event is appended.
+ * @param input - encoded bytes, declared media type, and optional display name.
+ * @returns a durable content-addressed reference.
+ */
+abstract saveTextFile(input: SaveTextFileAttachment): Promise<TextFileAttachmentRef>
+
+/**
+ * Read one text file and verify that bytes and UTF-8 text still match the recorded reference.
+ * @param ref - durable reference from the session log.
+ * @param signal - optional cancellation for backend read and verification work.
+ * @returns the verified bytes, decoded text, and canonical reference.
+ * @throws the signal reason when aborted, or a storage error when verification fails.
+ */
+abstract readTextFile(ref: TextFileAttachmentRef, signal?: AbortSignal): Promise<StoredTextFileAttachment>
+```
+
+Source: [`packages/attachment/file-attachment/src/index.ts:28`](../../packages/attachment/file-attachment/src/index.ts)
 <!-- END GENERATED cordis-surface -->

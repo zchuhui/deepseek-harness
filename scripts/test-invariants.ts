@@ -15,6 +15,13 @@ import type {
   SaveImageAttachment,
   StoredImageAttachment,
 } from '@deepseek-ai/dsh-attachment'
+import { FileAttachmentStore } from '@deepseek-ai/dsh-file-attachment'
+import type {
+  SaveTextFileAttachment,
+  StoredTextFileAttachment,
+  TextFileAttachmentLimits,
+  TextFileAttachmentRef,
+} from '@deepseek-ai/dsh-file-attachment'
 import InvariantRegistry from '@deepseek-ai/dsh-invariants'
 
 declare global {
@@ -61,7 +68,6 @@ type PluginFiber = ReturnType<RegistryService['plugin']>
 type PluginCallback = Plugin.Function | Plugin.Constructor
 
 const hosts = new WeakMap<Context, InvariantHost>()
-// oxlint-disable-next-line typescript/unbound-method -- every call below supplies its RegistryService receiver explicitly.
 const originalPlugin = RegistryService.prototype.plugin
 
 RegistryService.prototype.plugin = function(plugin: Plugin, config?: unknown, getOuterStack?: () => string[]) {
@@ -110,6 +116,7 @@ export function usesManualInvariantTree(testPath: string): boolean {
 
 const ALL_COMPANION_TESTS = ['/scripts/test-invariants.spec.ts'] as const
 const ATTACHMENT_COMPANION = '../packages/attachment/attachment-local/src/invariant.ts'
+const FILE_ATTACHMENT_COMPANION = '../packages/attachment/file-attachment-local/src/invariant.ts'
 
 class TestAttachmentStore extends AttachmentStore {
   readonly imageLimits: ImageAttachmentLimits = {
@@ -130,6 +137,28 @@ class TestAttachmentStore extends AttachmentStore {
 
   readImage(_ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
     return Promise.reject(new Error('test invariant attachment store does not read images'))
+  }
+}
+
+class TestFileAttachmentStore extends FileAttachmentStore {
+  readonly textFileLimits: TextFileAttachmentLimits = {
+    maxFileBytes: 1,
+    maxFilesPerMessage: 1,
+    maxMessageFileBytes: 1,
+    maxDecodedTextBytes: 1,
+    mediaTypes: ['text/plain'],
+  }
+
+  validateTextFile(_input: SaveTextFileAttachment): Promise<void> {
+    return Promise.reject(new Error('test invariant file attachment store does not validate files'))
+  }
+
+  saveTextFile(_input: SaveTextFileAttachment): Promise<TextFileAttachmentRef> {
+    return Promise.reject(new Error('test invariant file attachment store does not save files'))
+  }
+
+  readTextFile(_ref: TextFileAttachmentRef): Promise<StoredTextFileAttachment> {
+    return Promise.reject(new Error('test invariant file attachment store does not read files'))
   }
 }
 
@@ -181,6 +210,9 @@ function startInvariantHost(root: Context): InvariantHost {
     const attachmentFiber = companionPaths.includes(ATTACHMENT_COMPANION)
       ? mount(TestAttachmentStore)
       : undefined
+    const fileAttachmentFiber = companionPaths.includes(FILE_ATTACHMENT_COMPANION)
+      ? mount(TestFileAttachmentStore)
+      : undefined
     const companions = await Promise.all(companionPaths.map(async (path) => {
       const load = testInvariantCompanions[path]
       if (load === undefined) {
@@ -200,6 +232,9 @@ function startInvariantHost(root: Context): InvariantHost {
       ...(attachmentFiber === undefined
         ? []
         : [requireActive(attachmentFiber, 'test attachment store')]),
+      ...(fileAttachmentFiber === undefined
+        ? []
+        : [requireActive(fileAttachmentFiber, 'test file attachment store')]),
       ...companionFibers.map(({ fiber, path }) => requireActive(fiber, path)),
     ])
     root.provide(TEST_INVARIANT_READY_SERVICE, true)

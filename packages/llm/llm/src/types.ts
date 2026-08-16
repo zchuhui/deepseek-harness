@@ -6,6 +6,7 @@
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { TextFileAttachmentRef } from '@deepseek-ai/dsh-file-attachment'
 import type { CallId, ProviderRequestId, ReasoningEffortId } from './brand.ts'
 import type { Message } from './message.ts'
 
@@ -74,6 +75,13 @@ export interface ImageBlock {
   attachment: ImageAttachmentRef
 }
 
+/** A durable UTF-8 file reference, valid in user or assistant content. */
+export interface FileBlock {
+  type: 'file'
+  /** Immutable UTF-8 file metadata owned by the file-attachment service. */
+  attachment: TextFileAttachmentRef
+}
+
 /** A tool invocation requested by the model. */
 export interface ToolCallBlock {
   type: 'tool-call'
@@ -100,6 +108,7 @@ export interface ContentBlockMap {
   'text': TextBlock
   'reasoning': ReasoningBlock
   'image': ImageBlock
+  'file': FileBlock
   'tool-call': ToolCallBlock
   'tool-result': ToolResultBlock
 }

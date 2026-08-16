@@ -126,6 +126,8 @@
     { "path": "./packages/util/desktop-bridge" },
     { "path": "./packages/attachment/attachment" },
     { "path": "./packages/attachment/attachment-local" },
+    { "path": "./packages/attachment/file-attachment" },
+    { "path": "./packages/attachment/file-attachment-local" },
     { "path": "./packages/llm/llm" },
     { "path": "./packages/llm/token-meter" },
     { "path": "./packages/core/session" },

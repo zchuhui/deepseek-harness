@@ -176,9 +176,11 @@ const BROWSE_STUB: DirectoryPickerCapability = {
       home: '/home/user',
       crumbs: [{ name: '/', path: '/', hidden: false }],
       entries: [{ name: 'projects', path: `${target}/projects`, hidden: false }],
+      files: [],
       truncated: false,
     }
   },
+  readFile: async () => ({ name: 'fixture.txt', mediaType: 'text/plain', data: 'Zml4dHVyZQ==' }),
   createDirectory: async (path, name) => {
     if (name === 'taken') throw new DirectoryPickerError('directory-exists', `${path}/${name}`, 'already exists')
     if (name === 'unwritable') throw new Error('disk detached')
@@ -216,6 +218,7 @@ describe('host.listDirectory / host.createDirectory', () => {
       list: (_path, signal) => new Promise((_resolve, reject) => {
         signal?.addEventListener('abort', () => { reject(new Error('scan aborted')) }, { once: true })
       }),
+      readFile: async () => ({ name: 'fixture.txt', mediaType: 'text/plain', data: 'Zml4dHVyZQ==' }),
       createDirectory: async () => '/never',
     })
     const abort = new AbortController()

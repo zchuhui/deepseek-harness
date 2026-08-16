@@ -605,6 +605,30 @@ export interface Config {
 
 来源：[`packages/e2b/e2b/src/index.ts:43`](../packages/e2b/e2b/src/index.ts)
 
+<a id="deepseek-aidsh-file-attachment-local"></a>
+
+## `@deepseek-ai/dsh-file-attachment-local`
+
+```ts config-catalog
+/** Configuration for the local text-file store. */
+export interface Config {
+  /** Optional Harness home override; objects live below `file-attachments/v1`. */
+  dshHome?: string
+  /** Maximum encoded bytes accepted for one source file. */
+  maxFileBytes?: number
+  /** Maximum text files one prompt may carry. */
+  maxFilesPerMessage?: number
+  /** Maximum combined encoded bytes for all text files in one prompt. */
+  maxMessageFileBytes?: number
+  /** Maximum decoded UTF-8 bytes accepted for one source file. */
+  maxDecodedTextBytes?: number
+  /** IANA media types eligible for durable UTF-8 text admission. */
+  mediaTypes?: string[]
+}
+```
+
+来源：[`packages/attachment/file-attachment-local/src/index.ts:14`](../packages/attachment/file-attachment-local/src/index.ts)
+
 <a id="deepseek-aidsh-fs-local"></a>
 
 ## `@deepseek-ai/dsh-fs-local`
@@ -802,10 +826,12 @@ export interface Config {
 export interface Config {
   /** Complete-result bound of one listing level; see {@link BrowseDirectoryPicker.Config}. */
   maxEntries: number
+  /** Maximum selected file size served to the browser. */
+  maxFileBytes: number
 }
 ```
 
-来源：[`packages/host/directory-picker-browse/src/index.ts:181`](../packages/host/directory-picker-browse/src/index.ts)
+来源：[`packages/host/directory-picker-browse/src/index.ts:193`](../packages/host/directory-picker-browse/src/index.ts)
 
 <a id="deepseek-aidsh-host-frontend-static"></a>
 
@@ -3167,6 +3193,27 @@ export interface Config {
 
 来源：[`packages/workspace/workspace-notes/src/index.ts:47`](../packages/workspace/workspace-notes/src/index.ts)
 
+<a id="deepseek-aidsh-workspace-notes-agent"></a>
+
+## `@deepseek-ai/dsh-workspace-notes-agent`
+
+需要：`tools` · `systemPrompt` · `workspaceNotes` · `workspaceRegistry`
+
+```ts config-catalog
+/** Deployment policy for the notes agent integration. */
+export interface Config extends NotesRenderConfig {}
+
+/** Deployment-varying caps that shape every rendered project-memory snapshot. */
+export interface NotesRenderConfig {
+  /** Maximum total UTF-8 bytes of the joined note blocks. */
+  readonly maxRenderBytes: number
+  /** Maximum number of notes included before older ones are omitted. */
+  readonly maxNotes: number
+}
+```
+
+来源：[`packages/workspace/workspace-notes-agent/src/index.ts:48`](../packages/workspace/workspace-notes-agent/src/index.ts)
+
 <a id="deepseek-aidsh-workspace-todos"></a>
 
 ## `@deepseek-ai/dsh-workspace-todos`
@@ -3182,6 +3229,32 @@ export interface Config {
 ```
 
 来源：[`packages/workspace/workspace-todos/src/index.ts:54`](../packages/workspace/workspace-todos/src/index.ts)
+
+<a id="deepseek-aidsh-workspace-todos-agent"></a>
+
+## `@deepseek-ai/dsh-workspace-todos-agent`
+
+需要：`tools` · `workspaceTodos` · `workspaceRegistry`
+
+```ts config-catalog
+/**
+ * Deployment policy for the todos agent integration: create and content-edit
+ * calls always ask a human before they commit; `statusUpdateApproval` decides
+ * whether set-status calls on existing todos ask too.
+ */
+export interface Config {
+  /** Required policy for set-status calls on existing workspace todos. */
+  readonly statusUpdateApproval: TodosStatusApprovalPolicy
+}
+
+/**
+ * Whether `todos_update` set-status calls ask a human before they commit.
+ * Create and content-edit calls always ask regardless of this policy.
+ */
+export type TodosStatusApprovalPolicy = 'ask' | 'allow'
+```
+
+来源：[`packages/workspace/workspace-todos-agent/src/index.ts:30`](../packages/workspace/workspace-todos-agent/src/index.ts)
 
 ## 无配置的可加载插件
 
@@ -3265,6 +3338,7 @@ export interface Config {
 - `@deepseek-ai/dsh-code-runtime` — 抽象 `CodeRuntime`（[`packages/code-runtime/code-runtime/src/index.ts`](../packages/code-runtime/code-runtime/src/index.ts)）
 - `@deepseek-ai/dsh-compaction` — 抽象 `CompactionEngine`（[`packages/compaction/compaction/src/index.ts`](../packages/compaction/compaction/src/index.ts)）
 - `@deepseek-ai/dsh-credentials` — 抽象 `Credentials`（[`packages/credentials/credentials/src/index.ts`](../packages/credentials/credentials/src/index.ts)）
+- `@deepseek-ai/dsh-file-attachment` — 抽象 `FileAttachmentStore`（[`packages/attachment/file-attachment/src/index.ts`](../packages/attachment/file-attachment/src/index.ts)）
 - `@deepseek-ai/dsh-fs` — 抽象 `FileSystem`（[`packages/fs/fs/src/index.ts`](../packages/fs/fs/src/index.ts)）
 - `@deepseek-ai/dsh-host-desktop` — 抽象 `DesktopHost`（[`packages/host/desktop/src/index.ts`](../packages/host/desktop/src/index.ts)）
 - `@deepseek-ai/dsh-host-directory-picker` — 抽象 `DirectoryPicker`（[`packages/host/directory-picker/src/index.ts`](../packages/host/directory-picker/src/index.ts)）
@@ -3318,3 +3392,5 @@ export interface Config {
 - `@deepseek-ai/dsh-typert-generator`（[`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts)）
 - `@deepseek-ai/dsh-typert-protocol`（[`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts)）
 - `@deepseek-ai/dsh-typert-registry`（[`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts)）
+- `@deepseek-ai/dsh-workspace-notes-bundle`（[`packages/bundle/workspace-notes-bundle/src/index.ts`](../packages/bundle/workspace-notes-bundle/src/index.ts)）
+- `@deepseek-ai/dsh-workspace-todos-bundle`（[`packages/bundle/workspace-todos-bundle/src/index.ts`](../packages/bundle/workspace-todos-bundle/src/index.ts)）

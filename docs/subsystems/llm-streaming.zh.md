@@ -866,7 +866,7 @@ The provider topology changed: an adapter registered or unregistered routes, or 
 'llm/adapters-updated'(): void
 ```
 
-Source: [`packages/llm/llm/src/types.ts:23`](../../packages/llm/llm/src/types.ts)
+Source: [`packages/llm/llm/src/types.ts:24`](../../packages/llm/llm/src/types.ts)
 
 <a id="llmstream--waterfall"></a>
 

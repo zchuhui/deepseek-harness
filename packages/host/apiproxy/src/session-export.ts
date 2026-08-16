@@ -1,10 +1,11 @@
 /**
  * Host-side session-log download: streams one ZIP archive whose files are the
- * sessions' stored artifact text verbatim plus every referenced media object.
+ * sessions' stored artifact text verbatim plus every referenced image and text-file object.
  * The root artifact sits under its original base name (`session.jsonl`); each
  * subagent descendant under `subagents/<id>/<filename>`; each image referenced
- * by any included log under `media/<attachmentId>.<ext>` (content-addressed,
- * so one archive never duplicates a shared image). No manifest is written —
+ * by any included log under `media/<attachmentId>.<ext>` and each text file
+ * under `files/<attachmentId>.txt` (content-addressed, so one archive never
+ * duplicates a shared object). No manifest is written —
  * every file is byte-identical to the backend's durable artifact or attachment
  * store and self-describing through its own header line or media type. Before
  * each live session's artifact read, the SessionStore flush barrier makes the
@@ -22,6 +23,7 @@
 import { Zip, ZipDeflate } from 'fflate'
 import type { Context } from '@deepseek-ai/cordis'
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { FileAttachmentStore, TextFileAttachmentRef } from '@deepseek-ai/dsh-file-attachment'
 import type { SessionLineageNode, SessionQueryEngine } from '@deepseek-ai/dsh-session-query'
 import type { SessionId, SessionStore } from '@deepseek-ai/dsh-session'
 import type { SessionPersistence, SessionRawArtifact } from '@deepseek-ai/dsh-session-persistence'
@@ -37,6 +39,7 @@ export interface SessionLogExportDeps {
   readonly sessionQuery: SessionQueryEngine | undefined
   readonly sessionPersistence: SessionPersistence | undefined
   readonly attachments: AttachmentStore | undefined
+  readonly fileAttachments: FileAttachmentStore | undefined
   readonly sessions: SessionStore | undefined
 }
 
@@ -45,6 +48,7 @@ export interface SessionLogExportReady {
   readonly sessionQuery: SessionQueryEngine
   readonly sessionPersistence: SessionPersistence
   readonly attachments: AttachmentStore
+  readonly fileAttachments: FileAttachmentStore | undefined
   readonly sessions: SessionStore | undefined
 }
 
@@ -58,6 +62,7 @@ export function sessionLogExportDeps(ctx: Context): SessionLogExportDeps {
     sessionQuery: ctx.get('sessionQuery'),
     sessionPersistence: ctx.get('sessionPersistence'),
     attachments: ctx.get('attachments'),
+    fileAttachments: ctx.get('fileAttachments'),
     sessions: ctx.get('sessions'),
   }
 }
@@ -108,6 +113,11 @@ function mediaEntryPath(ref: ImageAttachmentRef): string {
   return `media/${String(ref.attachmentId)}.${MEDIA_TYPE_EXTENSIONS[ref.mediaType]}`
 }
 
+/** Archive path for one durable text file, keyed by its opaque content id. */
+function fileEntryPath(ref: TextFileAttachmentRef): string {
+  return `files/${String(ref.attachmentId)}.txt`
+}
+
 /**
  * Collect every image reference inside one content array, descending into
  * nested tool results the way the live attachment route does.
@@ -129,6 +139,22 @@ function collectImageRefs(content: unknown, refs: Map<string, ImageAttachmentRef
     if (Array.isArray(block.content)) {
       for (const item of block.content) pending.push(item)
     }
+  }
+}
+
+/** Collect every durable text-file reference inside one content array. */
+function collectFileRefs(content: unknown, refs: Map<string, TextFileAttachmentRef>): void {
+  if (!Array.isArray(content)) return
+  const pending: unknown[] = [...content]
+  while (pending.length > 0) {
+    const value = pending.pop()
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+    const block = value as { type?: unknown; attachment?: unknown; content?: unknown }
+    if (block.type === 'file' && typeof block.attachment === 'object' && block.attachment !== null) {
+      const ref = block.attachment as TextFileAttachmentRef
+      refs.set(String(ref.attachmentId), ref)
+    }
+    if (Array.isArray(block.content)) pending.push(...block.content)
   }
 }
 
@@ -156,6 +182,24 @@ function collectEventImageRefs(event: unknown, refs: Map<string, ImageAttachment
   if (carrier.chunk?.type === 'block-end') collectImageRefs([carrier.chunk.block], refs)
 }
 
+/** Collect every text-file reference one session event carries. */
+function collectEventFileRefs(event: unknown, refs: Map<string, TextFileAttachmentRef>): void {
+  const data = (event as { data?: unknown }).data
+  if (typeof data !== 'object' || data === null) return
+  const carrier = data as {
+    content?: unknown
+    message?: { content?: unknown }
+    inserted?: Array<{ content?: unknown }>
+    chunk?: { type?: unknown; block?: unknown }
+  }
+  collectFileRefs(carrier.content, refs)
+  if (carrier.message !== undefined) collectFileRefs(carrier.message.content, refs)
+  if (carrier.inserted !== undefined) {
+    for (const message of carrier.inserted) collectFileRefs(message.content, refs)
+  }
+  if (carrier.chunk?.type === 'block-end') collectFileRefs([carrier.chunk.block], refs)
+}
+
 /**
  * Collect the distinct media references one stored artifact text names.
  * Lines that fail to parse cannot reference media and are skipped (the
@@ -174,6 +218,20 @@ function imageRefsInArtifact(content: string): Map<string, ImageAttachmentRef> {
       continue
     }
     collectEventImageRefs(event, refs)
+  }
+  return refs
+}
+
+/** Collect distinct durable text-file references from one stored artifact. */
+function fileRefsInArtifact(content: string): Map<string, TextFileAttachmentRef> {
+  const refs = new Map<string, TextFileAttachmentRef>()
+  for (const line of content.split('\n')) {
+    if (line === '') continue
+    try {
+      collectEventFileRefs(JSON.parse(line), refs)
+    } catch {
+      // An invalid log line cannot contribute a readable reference.
+    }
   }
   return refs
 }
@@ -224,8 +282,10 @@ export async function* sessionLogZipEntries(
   signal?: AbortSignal,
 ): AsyncGenerator<SessionLogZipEntry> {
   const media = new Map<string, ImageAttachmentRef>()
+  const files = new Map<string, TextFileAttachmentRef>()
   const rememberMedia = (content: string): void => {
     for (const [id, ref] of imageRefsInArtifact(content)) media.set(id, ref)
+    for (const [id, ref] of fileRefsInArtifact(content)) files.set(id, ref)
   }
   rememberMedia(root.content)
   yield { path: root.filename, content: root.content }
@@ -262,6 +322,14 @@ export async function* sessionLogZipEntries(
     const stored = await deps.attachments.readImage(ref, signal)
     signal?.throwIfAborted()
     yield { path: mediaEntryPath(ref), data: stored.data }
+  }
+  for (const ref of files.values()) {
+    signal?.throwIfAborted()
+    const store = deps.fileAttachments
+    if (store === undefined) throw new Error('session log references file attachments but no file attachment service is mounted')
+    const stored = await store.readTextFile(ref, signal)
+    signal?.throwIfAborted()
+    yield { path: fileEntryPath(ref), data: stored.data }
   }
 }
 

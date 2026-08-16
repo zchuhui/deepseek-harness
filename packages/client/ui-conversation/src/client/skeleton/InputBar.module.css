@@ -28,6 +28,145 @@
   padding: 0 var(--dsh-composer-side-clearance) 8px;
 }
 
+.directoryPickerBackdrop {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in srgb, #000 52%, transparent);
+}
+
+.directoryPicker {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, 100%);
+  max-height: min(680px, calc(100vh - 48px));
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 14px;
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-shadow-lv3);
+  color: var(--dsw-alias-label-primary);
+}
+
+.directoryPickerHeader,
+.directoryPickerFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+}
+
+.directoryPickerHeader p {
+  margin: 4px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+}
+
+.directoryPickerClose,
+.directoryPickerCancel,
+.directoryPickerAdd {
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.directoryPickerClose { padding: 2px 8px; background: transparent; color: inherit; font-size: 22px; }
+.directoryPickerCancel { margin-right: 8px; background: transparent; color: var(--dsw-alias-label-primary); }
+.directoryPickerAdd { background: var(--dsw-alias-state-business-primary); color: #fff; }
+.directoryPickerAdd:disabled, .directoryPickerCancel:disabled, .directoryPickerClose:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.directoryPickerTree {
+  min-height: 260px;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.directoryPickerRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding-right: 16px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+}
+
+.directoryPickerRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
+
+.directoryPickerFolder {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.directoryPickerChevron {
+  flex: 0 0 auto;
+  color: var(--dsw-alias-label-tertiary);
+  transition: transform 0.16s ease-out, color 0.16s ease-out;
+}
+
+.directoryPickerChevronOpen {
+  color: var(--dsw-alias-state-business-primary);
+  transform: rotate(90deg);
+}
+
+.directoryPickerFolderIcon,
+.directoryPickerFileIcon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.directoryPickerFolderIcon {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.directoryPickerFolderIcon svg,
+.directoryPickerFileIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.directoryPickerEntryName {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.directoryPickerFolder:hover .directoryPickerFolderIcon,
+.directoryPickerFolder:hover .directoryPickerChevron {
+  color: var(--dsw-alias-label-primary);
+}
+
+.directoryPickerRow small { margin-left: auto; color: var(--dsw-alias-label-secondary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .directoryPickerChevron {
+    transition: none;
+  }
+}
+
+.directoryPickerFooter { border-top: 1px solid var(--dsw-alias-border-l2-darkmode-thin); border-bottom: 0; }
+
 .hero {
   /* No bottom pad in the centered hero, but the side clearance must survive:
      the hero wrapper is full-width on narrow viewports, so this padding is
@@ -124,13 +263,93 @@
   padding: 10px 12px 0;
 }
 
-/* Rail seat: the card's top padding (10px) plus this 4px matches DeepSeek
-   Chat's spacing above the thumbnails; the card's 12px flex gap owns the space
-   below. The rail itself (arrows, hidden scrollbar, card geometry) is the
-   ui-attachment atom's. */
-.attachments {
+.embeddedContext {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   min-width: 0;
-  padding: 4px 12px 0;
+  padding: 2px 12px 0;
+}
+
+.embeddedContextItem {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: min(340px, 100%);
+  height: 30px;
+  padding: 0 7px 0 5px;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 7px;
+  background: var(--dsw-alias-fill-tertiary);
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+}
+
+.embeddedContextIcon,
+.embeddedImage {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.embeddedContextIcon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.embeddedImage {
+  padding: 0;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.embeddedImage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.embeddedContextName {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embeddedContextKind {
+  flex: 0 0 auto;
+  margin-left: 7px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+}
+
+.embeddedContextRemove {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.embeddedContextRemove:hover,
+.embeddedContextRemove:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 
 /* Floating overlay anchor (menu / popupSelect shell): entries position

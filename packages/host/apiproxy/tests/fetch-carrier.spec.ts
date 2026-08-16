@@ -151,7 +151,10 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { path: null } } }
       },
       async listDirectory(request) {
-        return { rpcId: request.rpcId, result: { ok: true, value: { path: '/w', home: '/w', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], truncated: false } } }
+        return { rpcId: request.rpcId, result: { ok: true, value: { path: '/w', home: '/w', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], files: [], truncated: false } } }
+      },
+      async readDirectoryFile(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { name: 'fixture.txt', mediaType: 'text/plain', data: 'Zml4dHVyZQ==' } } }
       },
       async createDirectory(request) {
         return { rpcId: request.rpcId, result: { ok: true, value: { path: '/w/new' } } }
@@ -415,7 +418,7 @@ describe('unary round trip (handler ⇄ client, no network)', () => {
     const listed = await c.host.listDirectory({ path: '/w' })
     expect(listed.result).toEqual({
       ok: true,
-      value: { path: '/w', home: '/w', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], truncated: false },
+      value: { path: '/w', home: '/w', crumbs: [{ name: '/', path: '/', hidden: false }], entries: [], files: [], truncated: false },
     })
     const home = await c.host.listDirectory({})
     expect(home.result).toMatchObject({ ok: true, value: { home: '/w' } })

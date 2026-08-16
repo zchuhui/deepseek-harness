@@ -21,6 +21,7 @@ import type {
   UserMessage,
 } from '@deepseek-ai/dsh-llm'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { TextFileAttachmentRef } from '@deepseek-ai/dsh-file-attachment'
 import type {
   SessionEvent,
   SessionId,
@@ -2414,6 +2415,15 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         const userText = content.map(b => (b.type === 'text' ? b.text : '')).join('')
         const durable: ContentBlock[] = content.map((block) => {
           if (block.type === 'text') return block
+          if (block.type === 'file') {
+            const attachment: TextFileAttachmentRef = {
+              attachmentId: `fixture:${randomUuid()}` as TextFileAttachmentRef['attachmentId'],
+              mediaType: block.mediaType,
+              bytes: Math.max(1, Math.floor(block.data.length * 3 / 4)),
+              ...block.name === undefined ? {} : { name: block.name },
+            }
+            return { type: 'file', attachment }
+          }
           const attachment: ImageAttachmentRef = {
             attachmentId: `fixture:${randomUuid()}` as AttachmentIdType,
             mediaType: block.mediaType,
@@ -2541,10 +2551,12 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           crumbs: crumbsOf(target),
           entries: [...children].sort((a, b) => a.localeCompare(b))
             .map(name => ({ name, path: target === '/' ? `/${name}` : `${target}/${name}`, hidden: name.startsWith('.') })),
+          files: [],
           // The fixture tree is tiny; no level ever reaches a backend bound.
           truncated: false,
         })
       },
+      readDirectoryFile: request => err(request, { code: 'directory-unreadable', message: 'fixture files are unavailable', details: { path: request.payload.path } }),
       createDirectory: (request) => {
         const parent = request.payload.path
         const children = childrenOf(parent)
@@ -3104,6 +3116,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'host.describe': return this.api.host.describe(request)
       case 'host.pickDirectory': return this.api.host.pickDirectory(request, new AbortController().signal)
       case 'host.listDirectory': return this.api.host.listDirectory(request, new AbortController().signal)
+      case 'host.readDirectoryFile': return this.api.host.readDirectoryFile(request, new AbortController().signal)
       case 'host.createDirectory': return this.api.host.createDirectory(request)
       case 'host.openPath': return this.api.host.openPath(request, new AbortController().signal)
       case 'host.reportWindow': return this.api.host.reportWindow(request)

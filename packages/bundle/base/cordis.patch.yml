@@ -106,6 +106,11 @@
     - id: attachment-local
       name: '@deepseek-ai/dsh-attachment-local'
 
+    # UTF-8 text files use a separate durable store. The session log carries
+    # only immutable references; providers resolve their contents at request time.
+    - id: file-attachment-local
+      name: '@deepseek-ai/dsh-file-attachment-local'
+
     # Full-text session search is opt-in. `openAt: never` keeps
     # ctx.sessionQuery mounted — exact reads, titles, and lineage traces
     # (session export, subagent-fork Workspace inheritance) stay available —

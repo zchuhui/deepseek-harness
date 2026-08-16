@@ -587,6 +587,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'fileAttachments',
+    summary: 'Immutable UTF-8 text-file attachment service.',
+    description: 'Immutable UTF-8 text-file attachment service. Implementations validate bytes before publishing a reference.',
+    methods: [
+      {
+        signature: 'abstract readonly textFileLimits: TextFileAttachmentLimits',
+        description: 'Deployment-resolved file policy used by authoritative and fast-path validation.',
+        parameters: [],
+      },
+      {
+        signature: 'abstract validateTextFile(input: SaveTextFileAttachment): Promise<void>',
+        description: 'Validate one UTF-8 text file without persisting it. Batch callers validate every member before saving any member.',
+        parameters: [{ name: 'input', description: 'encoded bytes, declared media type, and optional display name.' }],
+        returns: 'completion after UTF-8 and media policy validation.',
+      },
+      {
+        signature: 'abstract saveTextFile(input: SaveTextFileAttachment): Promise<TextFileAttachmentRef>',
+        description: 'Validate and durably commit one text file before its owning session event is appended.',
+        parameters: [{ name: 'input', description: 'encoded bytes, declared media type, and optional display name.' }],
+        returns: 'a durable content-addressed reference.',
+      },
+      {
+        signature: 'abstract readTextFile(ref: TextFileAttachmentRef, signal?: AbortSignal): Promise<StoredTextFileAttachment>',
+        description: 'Read one text file and verify that bytes and UTF-8 text still match the recorded reference.',
+        parameters: [{ name: 'ref', description: 'durable reference from the session log.' }, { name: 'signal', description: 'optional cancellation for backend read and verification work.' }],
+        returns: 'the verified bytes, decoded text, and canonical reference.',
+        throws: ['the signal reason when aborted, or a storage error when verification fails.'],
+      },
+    ],
+  },
+  {
     key: 'fs',
     summary: 'Abstract filesystem provider.',
     description: 'Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.',
@@ -2242,6 +2273,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'path', description: 'Existing directory path in any spelling.' }],
         returns: 'the workspace owning the canonical path, when one exists.',
       },
+      {
+        signature: 'resolveBySession(sessionId: SessionId): Workspace | undefined',
+        description: 'Resolve the workspace owning a session by header-validated membership — the same filtered `sessionIds` projection every grouping surface uses. A session accounted by no workspace resolves to `undefined`; callers offering workspace-scoped tooling hide it for such sessions rather than guessing a workspace by path.',
+        parameters: [{ name: 'sessionId', description: 'The session whose owning workspace is requested.' }],
+        returns: 'the owning workspace, or `undefined` when none accounts it.',
+      },
     ],
   },
   {
@@ -2981,7 +3018,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ContentBlockMap',
-    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n}',
+    declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'file\': FileBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-result\': ToolResultBlock;\n}',
   },
   {
     name: 'ContentBlockType',
@@ -3085,7 +3122,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DirectoryPickerBrowseCapability',
-    declaration: 'export interface DirectoryPickerBrowseCapability {\n    kind: \'browse\';\n    list(path?: string, signal?: AbortSignal): Promise<DirectoryListing>;\n    createDirectory(path: string, name: string): Promise<string>;\n}',
+    declaration: 'export interface DirectoryPickerBrowseCapability {\n    kind: \'browse\';\n    list(path?: string, signal?: AbortSignal): Promise<DirectoryListing>;\n    readFile(path: string, signal?: AbortSignal): Promise<DirectoryFile>;\n    createDirectory(path: string, name: string): Promise<string>;\n}',
   },
   {
     name: 'DirectoryPickerCapabilities',
@@ -3182,6 +3219,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
+  },
+  {
+    name: 'FileAttachmentId',
+    declaration: 'export type FileAttachmentId = Branded<\'FileAttachmentId\'>;',
+  },
+  {
+    name: 'FileBlock',
+    declaration: 'export interface FileBlock {\n    type: \'file\';\n    attachment: TextFileAttachmentRef;\n}',
   },
   {
     name: 'FileDiff',
@@ -3848,6 +3893,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SaveImageAttachment {\n    data: Uint8Array;\n    mediaType: ImageMediaType;\n    name?: string;\n}',
   },
   {
+    name: 'SaveTextFileAttachment',
+    declaration: 'export interface SaveTextFileAttachment {\n    data: Uint8Array;\n    mediaType: string;\n    name?: string;\n}',
+  },
+  {
     name: 'SaveTextSpill',
     declaration: 'export interface SaveTextSpill {\n    owner: SpillOwner;\n    source: SpillSource;\n    suggestedName: string;\n    content: string;\n}',
   },
@@ -4384,6 +4433,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface StoredImageAttachment {\n    ref: ImageAttachmentRef;\n    data: Uint8Array;\n}',
   },
   {
+    name: 'StoredTextFileAttachment',
+    declaration: 'export interface StoredTextFileAttachment {\n    ref: TextFileAttachmentRef;\n    data: Uint8Array;\n    text: string;\n}',
+  },
+  {
     name: 'StreamChunk',
     declaration: 'export type StreamChunk = {\n    type: \'block-start\';\n    index: number;\n    blockType: ContentBlockType;\n} | {\n    type: \'text-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'reasoning-delta\';\n    index: number;\n    text: string;\n} | {\n    type: \'tool-call-delta\';\n    index: number;\n    id: CallId;\n    name?: string;\n    argumentsDelta: string;\n} | {\n    type: \'block-end\';\n    index: number;\n    block: ContentBlock;\n} | {\n    type: \'usage\';\n    usage: TokenUsage;\n} | {\n    type: \'finish\';\n    reason: FinishReason;\n    replayState?: unknown;\n};',
   },
@@ -4614,6 +4667,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TerminalWaitReason',
     declaration: 'export type TerminalWaitReason = \'stdin_read\' | \'inferred_idle\' | \'timeout\' | \'session_exit\';',
+  },
+  {
+    name: 'TextFileAttachmentLimits',
+    declaration: 'export interface TextFileAttachmentLimits {\n    maxFileBytes: number;\n    maxFilesPerMessage: number;\n    maxMessageFileBytes: number;\n    maxDecodedTextBytes: number;\n    mediaTypes: readonly string[];\n}',
+  },
+  {
+    name: 'TextFileAttachmentRef',
+    declaration: 'export interface TextFileAttachmentRef {\n    attachmentId: FileAttachmentId;\n    mediaType: string;\n    bytes: number;\n    name?: string;\n}',
   },
   {
     name: 'TodoItem',
@@ -4997,7 +5058,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WorkspaceNotesListValue',
-    declaration: 'export interface WorkspaceNotesListValue {\n    readonly notes: readonly WorkspaceNote[];\n}',
+    declaration: 'export interface WorkspaceNotesListValue {\n    readonly notes: readonly WorkspaceNote[];\n    readonly familyRevision: number;\n}',
   },
   {
     name: 'WorkspaceNoteSource',

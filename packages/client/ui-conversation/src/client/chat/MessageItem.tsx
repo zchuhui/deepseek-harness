@@ -18,14 +18,17 @@ import { MessageIconActions } from './MessageIconActions.tsx'
 import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
+type UserFile = Extract<UserMessageNode['content'][number], { type: 'file' }>
 
 function contentParts(content: readonly unknown[]): {
   text: string
   images: { attachment: UserImage['attachment'] }[]
+  files: { attachment: UserFile['attachment'] }[]
   rest: unknown[]
 } {
   const texts: string[] = []
   const images: { attachment: UserImage['attachment'] }[] = []
+  const files: { attachment: UserFile['attachment'] }[] = []
   const rest: unknown[] = []
   for (const block of content) {
     const b = block as { type?: string; text?: string; attachment?: unknown }
@@ -33,9 +36,16 @@ function contentParts(content: readonly unknown[]): {
     else if (b.type === 'image' && b.attachment !== undefined) {
       images.push({ attachment: (b as UserImage).attachment })
     }
+    else if (b.type === 'file' && b.attachment !== undefined) {
+      files.push({ attachment: (b as UserFile).attachment })
+    }
     else rest.push(block)
   }
-  return { text: texts.join(''), images, rest }
+  return { text: texts.join(''), images, files, rest }
+}
+
+function fileSize(bytes: number): string {
+  return bytes < 1024 ? `${bytes} B` : `${Math.ceil(bytes / 1024)} KB`
 }
 
 function retrySeconds(milliseconds: number): number {
@@ -187,13 +197,23 @@ function UserStyleBubble({
   pending?: boolean
   t: ChatViewSlotProps['t']
 }): ReactNode {
-  const { text, images, rest } = contentParts(content)
+  const { text, images, files, rest } = contentParts(content)
   const truncated = (total: number): string => t('json.truncated', { total })
   const showBubble = text !== '' || rest.length > 0
   return (
     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
       <div className={css.userStack}>
         <ImageGallery images={images} load={imageLoader} align="end" labels={messageImageLabels(t)} />
+        {files.length > 0 && (
+          <div className={css.fileList} aria-label={t('file.attachedGroup')}>
+            {files.map(({ attachment }) => (
+              <div key={String(attachment.attachmentId)} className={css.fileCard}>
+                <span className={css.fileName}>{attachment.name ?? t('file.unnamed')}</span>
+                <span className={css.fileMeta}>{attachment.mediaType} · {fileSize(attachment.bytes)}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {showBubble && <div className={css.bubble}>
           {projectUserText(text)}
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}

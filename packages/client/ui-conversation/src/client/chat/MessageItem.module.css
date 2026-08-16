@@ -29,6 +29,39 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.fileList {
+  display: grid;
+  width: min(340px, 100%);
+  gap: 6px;
+}
+
+.fileCard {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l);
+  border-radius: 10px;
+  background: var(--dsw-alias-fill-secondary);
+}
+
+.fileName {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileMeta {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .contextRow {
   padding: 2px 0;
 }

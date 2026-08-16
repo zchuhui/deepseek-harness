@@ -5,7 +5,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@deepseek-ai/dsh-llm'
+import { contentHasFile, contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@deepseek-ai/dsh-llm'
 import type {
   ContentBlock, FinishReason, GenerateOptions, Message, TokenUsage, ToolSchema,
 } from '@deepseek-ai/dsh-llm'
@@ -217,8 +217,8 @@ function finishError(finish: FinishReason): Error | undefined {
 function summaryText(
   blocks: readonly ContentBlock[],
 ): Array<Extract<ContentBlock, { type: 'text' }>> {
-  if (contentHasImage(blocks)) {
-    throw new LlmError('compaction summary cannot contain image output', 'UNSUPPORTED_CONTENT')
+  if (contentHasImage(blocks) || contentHasFile(blocks)) {
+    throw new LlmError('compaction summary cannot contain image or file output', 'UNSUPPORTED_CONTENT')
   }
   return blocks.filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
 }

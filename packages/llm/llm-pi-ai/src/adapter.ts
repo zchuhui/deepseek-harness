@@ -33,6 +33,7 @@ import type {
 } from '@earendil-works/pi-ai'
 import {
   attributionHeaders,
+  contentHasFile,
   contentHasImage,
   LlmAdapter,
   LlmError,
@@ -48,6 +49,7 @@ import type {
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import type { FileAttachmentStore } from '@deepseek-ai/dsh-file-attachment'
 import { idleWatchdog, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { toPiContext } from './context.ts'
@@ -76,6 +78,8 @@ export interface PiAiAdapterOptions {
   resolveApiKey: (provider: string, profile: ResolvedPiAiProviderProfile) => Promise<string | undefined>
   /** Resolve the optional durable attachment service at request time. */
   resolveAttachments?: () => AttachmentStore | undefined
+  /** Resolve the optional durable UTF-8 file attachment service at request time. */
+  resolveFileAttachments?: () => FileAttachmentStore | undefined
 }
 
 /** Copy profile stream knobs into pi-ai's common option vocabulary. */
@@ -300,16 +304,21 @@ export class PiAiAdapter extends LlmAdapter {
 
     try {
       const containsImage = options.messages.some(message => contentHasImage(message.content))
+      const containsFile = options.messages.some(message => contentHasFile(message.content))
       if (containsImage && !model.input.includes('image')) {
         throw new LlmError(`pi-ai model "${model.id}" does not support image input`, 'UNSUPPORTED_CONTENT')
       }
       const attachments = containsImage ? this.config.resolveAttachments?.() : undefined
+      const fileAttachments = containsFile ? this.config.resolveFileAttachments?.() : undefined
       if (containsImage && attachments === undefined) {
         throw new LlmError('pi-ai image input requires the durable attachment service', 'UNSUPPORTED_CONTENT')
       }
-      const context = attachments === undefined
+      if (containsFile && fileAttachments === undefined) {
+        throw new LlmError('pi-ai file input requires the durable file attachment service', 'UNSUPPORTED_CONTENT')
+      }
+      const context = attachments === undefined && fileAttachments === undefined
         ? toPiContext(options)
-        : await toPiContext(options, attachments)
+        : await toPiContext(options, attachments, fileAttachments)
       const events = snapshot.models.streamSimple(model, context, {
         ...profileOptions(profile, reasoning, apiKey),
         ...options.temperature === undefined ? {} : { temperature: options.temperature },

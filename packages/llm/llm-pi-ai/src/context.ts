@@ -4,9 +4,10 @@
  * @module dsh-llm-pi-ai/context
  */
 
-import { CallId, contentHasImage, LlmError } from '@deepseek-ai/dsh-llm'
+import { CallId, contentHasFile, contentHasImage, LlmError } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, GenerateOptions, Message } from '@deepseek-ai/dsh-llm'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
+import type { FileAttachmentStore } from '@deepseek-ai/dsh-file-attachment'
 import type { Context as PiContext, ImageContent, Message as PiMessage, TextContent, Tool as PiTool } from '@earendil-works/pi-ai'
 import { toPiAssistant } from './replay.ts'
 
@@ -26,9 +27,16 @@ function toolResultText(blocks: readonly ContentBlock[]): string {
     : block.type === 'tool-result' ? toolResultText(block.content) : '').join('')
 }
 
+/** Render a durable text-file reference as unambiguous model-visible text. */
+function renderedFile(name: string | undefined, mediaType: string, text: string): string {
+  const label = name === undefined ? 'unnamed file' : name
+  return `\n[Attached file: ${label} (${mediaType})]\n${text}\n[End attached file]\n`
+}
+
 async function userContent(
   blocks: readonly ContentBlock[],
-  attachments: AttachmentStore,
+  attachments: AttachmentStore | undefined,
+  fileAttachments: FileAttachmentStore | undefined,
 ): Promise<string | (TextContent | ImageContent)[]> {
   const content: (TextContent | ImageContent)[] = []
   for (const block of blocks) {
@@ -37,6 +45,9 @@ async function userContent(
         if (block.text.length > 0) content.push({ type: 'text', text: block.text })
         break
       case 'image': {
+        if (attachments === undefined) {
+          throw new LlmError('pi-ai image conversion requires the durable attachment service', 'UNSUPPORTED_CONTENT')
+        }
         const stored = await attachments.readImage(block.attachment)
         content.push({
           type: 'image',
@@ -45,9 +56,20 @@ async function userContent(
         })
         break
       }
+      case 'file': {
+        if (fileAttachments === undefined) {
+          throw new LlmError('pi-ai file conversion requires the durable file attachment service', 'UNSUPPORTED_CONTENT')
+        }
+        const stored = await fileAttachments.readTextFile(block.attachment)
+        content.push({
+          type: 'text',
+          text: renderedFile(stored.ref.name, stored.ref.mediaType, stored.text),
+        })
+        break
+      }
       case 'tool-result':
         {
-          const nested = await userContent(block.content, attachments)
+          const nested = await userContent(block.content, attachments, fileAttachments)
           if (typeof nested === 'string') {
             if (nested.length > 0) content.push({ type: 'text', text: nested })
           } else {
@@ -88,8 +110,8 @@ function textOnlyContext(options: GenerateOptions): PiContext {
   const toolNames = new Map<CallId, string>()
   const messages: PiMessage[] = []
   for (const message of options.messages) {
-    if (contentHasImage(message.content)) {
-      throw new LlmError('pi-ai image conversion requires the durable attachment service', 'UNSUPPORTED_CONTENT')
+    if (contentHasImage(message.content) || contentHasFile(message.content)) {
+      throw new LlmError('pi-ai image or file conversion requires a durable attachment service', 'UNSUPPORTED_CONTENT')
     }
     if (message.role === 'system') {
       messages.push({ role: 'user', content: flattenText(message), timestamp: 0 })
@@ -136,18 +158,40 @@ export function toPiContext(options: GenerateOptions): PiContext
  * @returns the asynchronously resolved pi-ai context.
  */
 export function toPiContext(options: GenerateOptions, attachments: AttachmentStore): Promise<PiContext>
-export function toPiContext(options: GenerateOptions, attachments?: AttachmentStore): PiContext | Promise<PiContext> {
-  return attachments === undefined ? textOnlyContext(options) : toPiContextWithImages(options, attachments)
+/**
+ * Convert harness history while resolving durable images and UTF-8 files.
+ * @param options - the harness request.
+ * @param attachments - optional durable image resolver.
+ * @param fileAttachments - optional durable text-file resolver.
+ * @returns the asynchronously resolved pi-ai context.
+ */
+export function toPiContext(
+  options: GenerateOptions,
+  attachments: AttachmentStore | undefined,
+  fileAttachments: FileAttachmentStore | undefined,
+): Promise<PiContext>
+export function toPiContext(
+  options: GenerateOptions,
+  attachments?: AttachmentStore,
+  fileAttachments?: FileAttachmentStore,
+): PiContext | Promise<PiContext> {
+  return attachments === undefined && fileAttachments === undefined
+    ? textOnlyContext(options)
+    : toPiContextWithAttachments(options, attachments, fileAttachments)
 }
 
-async function toPiContextWithImages(options: GenerateOptions, attachments: AttachmentStore): Promise<PiContext> {
+async function toPiContextWithAttachments(
+  options: GenerateOptions,
+  attachments: AttachmentStore | undefined,
+  fileAttachments: FileAttachmentStore | undefined,
+): Promise<PiContext> {
   const toolNames = new Map<CallId, string>()
   const messages: PiMessage[] = []
 
   for (const message of options.messages) {
     if (message.role === 'system') {
-      if (contentHasImage(message.content)) {
-        throw new LlmError('pi-ai cannot represent an image in an in-history system message', 'UNSUPPORTED_CONTENT')
+      if (contentHasImage(message.content) || contentHasFile(message.content)) {
+        throw new LlmError('pi-ai cannot represent image or file content in an in-history system message', 'UNSUPPORTED_CONTENT')
       }
       // pi-ai has a single systemPrompt slot; in-history system messages are
       // folded into user messages to preserve order (rare in practice — the
@@ -165,13 +209,13 @@ async function toPiContextWithImages(options: GenerateOptions, attachments: Atta
     }
     // user role: text + tool results (each result becomes its own message).
     const regular = message.content.filter(block => block.type !== 'tool-result')
-    const content = await userContent(regular, attachments)
+    const content = await userContent(regular, attachments, fileAttachments)
     const results = message.content.filter(block => block.type === 'tool-result')
     if (content.length > 0 || results.length === 0) {
       messages.push({ role: 'user', content, timestamp: 0 })
     }
     for (const result of results) {
-      const resultContent = await userContent(result.content, attachments)
+      const resultContent = await userContent(result.content, attachments, fileAttachments)
       messages.push({
         role: 'toolResult',
         toolCallId: result.toolCallId,

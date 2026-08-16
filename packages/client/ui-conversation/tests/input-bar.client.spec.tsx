@@ -386,6 +386,25 @@ describe('image draft rail', () => {
     expect(view.queryByRole('dialog', { name: '原图预览' })).toBeNull()
   })
 
+  it('embeds a selected text file as a compact composer context row', () => {
+    const file = new File(['{}'], 'tsconfig.json', { type: 'application/json' })
+    const attachment = { kind: 'file' as const, id: 'draft-1' as DraftAttachmentId, file }
+    const { view, removeImage } = bench({ attachments: [attachment] })
+
+    expect(view.getByRole('group', { name: '已附加文件' }).textContent).toContain('tsconfig.json文件')
+    fireEvent.click(view.getByRole('button', { name: '移除图片 tsconfig.json' }))
+    expect(removeImage).toHaveBeenCalledWith('draft-1')
+  })
+
+  it('sends a selected folder as its path without attaching descendants', () => {
+    const { view, textarea, sink, shell } = bench()
+    act(() => { shell.setFolderReferences([{ name: 'src', path: 'I:/codes/deepseek-harness/src' }]) })
+
+    expect(view.getByRole('group', { name: '已附加文件' }).textContent).toContain('src文件夹')
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(sink).toHaveBeenCalledWith('Directory path: I:/codes/deepseek-harness/src', [], 'queue')
+  })
+
   it('announces an image-intake rejection as a fading toast, repeatable for the same reason', () => {
     vi.useFakeTimers()
     try {

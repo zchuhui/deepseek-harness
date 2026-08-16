@@ -17,6 +17,14 @@ import type { InputSubmitMode } from '../contract/composer-submission.ts'
 /** Browser-runtime identity of one unsent image draft. */
 export type DraftAttachmentId = Branded<'DraftAttachmentId'>
 
+/** One selected workspace directory represented to the model by its absolute path. */
+export interface FolderReference {
+  /** Absolute directory path visible to the model at submission. */
+  readonly path: string
+  /** Base name rendered in the composer's context row. */
+  readonly name: string
+}
+
 /**
  * The scoped-event application verbs: the hub's bail listeners call these,
  * and the boolean answer IS the event's bail value (true ⟺ the machine
@@ -39,6 +47,8 @@ export interface SessionInput extends InputTarget {
   removeImage(id: DraftAttachmentId): void
   /** Drop ids whose browser-owned objects no longer exist. */
   pruneImages(ids: readonly DraftAttachmentId[]): void
+  /** Replace the selected workspace-directory paths for this draft. */
+  setFolderReferences(references: readonly FolderReference[]): void
   /**
    * THE complexity sink: enter adjudication, submit transaction, and the default sink live inside.
    * @param mode - delivery intent retained through asynchronous adjudication and serialization.
@@ -79,6 +89,8 @@ export interface InputActions {
   removeImage(id: DraftAttachmentId): void
   /** Drop ids whose browser-owned objects no longer exist. */
   pruneImages(ids: readonly DraftAttachmentId[]): void
+  /** Replace the selected workspace-directory paths for this draft. */
+  setFolderReferences?(references: readonly FolderReference[]): void
   /** Enter submission (adjudication / claim transaction / default sink inside). */
   submit(): void
 }
@@ -210,6 +222,8 @@ export interface InputState {
   readonly draft: string
   /** Ordered runtime-only image ids; bytes and URLs stay in ConversationController. */
   readonly imageIds: readonly DraftAttachmentId[]
+  /** Selected directories serialized as text alongside the user draft. */
+  readonly folderReferences?: readonly FolderReference[]
   /** Monotonic draft revision (span CAS compares against this). */
   readonly draftRev: number
   readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'

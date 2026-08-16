@@ -65,12 +65,12 @@ async function bootWeb(
     // this test's boot. Same reason the settings row above is pinned.
     { id: 'storage-json', config: { root: storageRoot } },
     // Host rows with side effects outside this process: a bound port, a served
-    // asset tree, a telemetry exporter. `api-gateway` and `directory-picker`
-    // stay ENABLED on purpose — the api-proxy is the host row that injects
-    // `subagents`, `workspace`, and the rest of the agent plane, so disabling
-    // it would hide exactly the breakage this file exists to catch: a service
-    // moved into the presets that a host row still waits for. The boot audit
-    // is that assertion.
+    // asset tree, a telemetry exporter. `api-gateway` stays ENABLED on
+    // purpose — the api-proxy is the host row that injects `subagents`,
+    // `workspace`, and the rest of the agent plane, so disabling it would
+    // hide exactly the breakage this file exists to catch: a service moved
+    // into the presets that a host row still waits for. The boot audit is
+    // that assertion.
     { id: 'webserver', disabled: true },
     // The web bundle's runtime row injects `webServer`, so it cannot
     // activate without the bound port disabled above. It owns dist serving
@@ -87,14 +87,8 @@ async function bootWeb(
     // The always-on reload chain waits for the browser roster and bound port
     // disabled above.
     { id: 'client-hmr', disabled: true },
-    // The shipped `-auto` chooser resolves its interaction from a running
-    // host and so waits for the webserver disabled above; the browse variant
-    // supplies `directoryPicker` without one.
-    { id: 'directory-picker', disabled: true },
-    { insert: [
-      { id: 'directory-picker-browse', name: '@deepseek-ai/dsh-host-directory-picker-browse' },
-      { id: 'ui-directory-picker-browse', name: '@deepseek-ai/dsh-client-ui-directory-picker-browse' },
-    ] },
+    // The shipped bundle pins the in-app browse picker pair itself, which
+    // needs no bound port.
     // The roster AppCLIEntry would patch in; only the shipped root, so a
     // developer's own `~/.dsh/.preset` cannot change this test's outcome.
     // `default` here is the COMPOSITION default — the base layer the settings

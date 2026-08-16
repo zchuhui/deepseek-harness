@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import { FileAttachmentId } from '@deepseek-ai/dsh-file-attachment'
+import type { FileAttachmentStore, TextFileAttachmentRef } from '@deepseek-ai/dsh-file-attachment'
 import { CallId, createMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, GenerateOptions, Message } from '@deepseek-ai/dsh-llm'
 import { toPiContext } from '../src/context.ts'
@@ -17,6 +19,17 @@ const ref: ImageAttachmentRef = {
 const attachments = {
   readImage: vi.fn(() => Promise.resolve({ ref, data: Uint8Array.of(1) })),
 } as unknown as AttachmentStore
+
+const fileRef: TextFileAttachmentRef = {
+  attachmentId: FileAttachmentId(`sha256:${'b'.repeat(64)}`),
+  mediaType: 'text/markdown',
+  bytes: 7,
+  name: 'notes.md',
+}
+
+const fileAttachments = {
+  readTextFile: vi.fn(() => Promise.resolve({ ref: fileRef, data: new TextEncoder().encode('# note\n'), text: '# note\n' })),
+} as unknown as FileAttachmentStore
 
 function request(messages: GenerateOptions['messages']): GenerateOptions {
   return {
@@ -138,6 +151,19 @@ describe('pi-ai request context conversion', () => {
         timestamp: 0,
       },
     ])
+  })
+
+  it('resolves durable UTF-8 files into delimited text context', async () => {
+    const context = await toPiContext(request([
+      user([{ type: 'file', attachment: fileRef }]),
+    ]), undefined, fileAttachments)
+
+    expect(context.messages).toEqual([{
+      role: 'user',
+      content: '\n[Attached file: notes.md (text/markdown)]\n# note\n\n[End attached file]\n',
+      timestamp: 0,
+    }])
+    expect(fileAttachments.readTextFile).toHaveBeenCalledWith(fileRef)
   })
 
   it('keeps empty text-only users while separating result-only messages', () => {

@@ -147,7 +147,7 @@ Abstract directory-picking service. Subclass, implement `capability()`, and load
 abstract capability(): DirectoryPickerCapability
 ```
 
-Source: [`packages/host/directory-picker/src/index.ts:131`](../../packages/host/directory-picker/src/index.ts)
+Source: [`packages/host/directory-picker/src/index.ts:160`](../../packages/host/directory-picker/src/index.ts)
 
 <a id="ctxworkspacenotes--workspacenotesservice"></a>
 
@@ -262,6 +262,17 @@ archiveSession(sessionId: SessionId): Promise<void>
  * @returns the workspace owning the canonical path, when one exists.
  */
 async resolveByPath(path: string): Promise<Workspace | undefined>
+
+/**
+ * Resolve the workspace owning a session by header-validated membership —
+ * the same filtered `sessionIds` projection every grouping surface uses.
+ * A session accounted by no workspace resolves to `undefined`; callers
+ * offering workspace-scoped tooling hide it for such sessions rather than
+ * guessing a workspace by path.
+ * @param sessionId - The session whose owning workspace is requested.
+ * @returns the owning workspace, or `undefined` when none accounts it.
+ */
+resolveBySession(sessionId: SessionId): Workspace | undefined
 ```
 
 Types: [SessionId](core.md)
@@ -351,7 +362,7 @@ A workspace's notes view changed after a committed create, update, delete, or co
 'workspace-notes/changed'(change: WorkspaceNotesChanged): void
 ```
 
-Source: [`packages/workspace/workspace-notes/src/types.ts:217`](../../packages/workspace/workspace-notes/src/types.ts)
+Source: [`packages/workspace/workspace-notes/src/types.ts:224`](../../packages/workspace/workspace-notes/src/types.ts)
 
 <a id="workspace-todos-events"></a>
 

@@ -14,7 +14,7 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {
   DraftAttachmentId, EditRange, EditSelection, InputActions, InputEffect, InputNotice, InputState,
-  PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,
+  FolderReference, PasteComponent, QueuedMessage, SessionInput, SubmitAttempt,
 } from './contract.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import { InputMachine } from './machine.ts'
@@ -59,6 +59,13 @@ function guardOf(phase: InputState['phase']): 'plain' | 'claimed' | 'frozen' {
 
 const EMPTY_QUEUE: readonly QueuedMessage[] = []
 
+/** Add selected directory paths to model-visible text without exposing implementation UI markup. */
+function withFolderReferences(draft: string, references: readonly FolderReference[]): string {
+  if (references.length === 0) return draft.trim()
+  const paths = references.map(reference => `Directory path: ${reference.path}`).join('\n')
+  return draft.trim() === '' ? paths : `${draft.trim()}\n\n${paths}`
+}
+
 /** No-pipeline lexicon: zero text-ref decorations. */
 const EMPTY_LEXICON: ReadonlyMap<'/' | '@', readonly string[]> = new Map()
 
@@ -77,6 +84,7 @@ export class SessionInputShell implements SessionInput {
     addImages: ids => this.addImages(ids),
     removeImage: (id) => { this.removeImage(id) },
     pruneImages: (ids) => { this.pruneImages(ids) },
+    setFolderReferences: (references) => { this.setFolderReferences(references) },
     submit: () => { this.submit('queue') },
   }
 
@@ -86,6 +94,7 @@ export class SessionInputShell implements SessionInput {
   private noticeSeq = 0
   private lastDraft = ''
   private imageIds: readonly DraftAttachmentId[] = []
+  private folderReferences: readonly FolderReference[] = []
   private disposed = false
   /** Draft persistence mirror (chat store write; receives the clipboard projection, never raw placeholders). */
   private mirrorFn: ((text: string) => void) | undefined
@@ -136,6 +145,13 @@ export class SessionInputShell implements SessionInput {
     this.publish()
   }
 
+  /** Replace selected workspace-directory paths unless an admission phase is active. */
+  setFolderReferences(references: readonly FolderReference[]): void {
+    if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return
+    this.folderReferences = references
+    this.publish()
+  }
+
   /**
    * Restore a failed attempt before any images added after its admission.
    * @param ids - failed attempt image ids.
@@ -143,6 +159,12 @@ export class SessionInputShell implements SessionInput {
   restoreImages(ids: readonly DraftAttachmentId[]): void {
     const current = new Set(this.imageIds)
     this.imageIds = [...ids.filter(id => !current.has(id)), ...this.imageIds]
+    this.publish()
+  }
+
+  /** Restore directory-path context after a prompt failure. */
+  restoreFolderReferences(references: readonly FolderReference[]): void {
+    this.folderReferences = references
     this.publish()
   }
 
@@ -155,6 +177,7 @@ export class SessionInputShell implements SessionInput {
   commitSend(imageIds: readonly DraftAttachmentId[]): void {
     const submitted = new Set(imageIds)
     this.imageIds = this.imageIds.filter(id => !submitted.has(id))
+    this.folderReferences = []
     this.run(this.core.dispatch({ type: 'send-committed' }))
   }
 
@@ -196,8 +219,8 @@ export class SessionInputShell implements SessionInput {
    * dismisses and the menu tracks frozen.
    */
   submit(mode: InputSubmitMode = 'queue'): void {
-    if (this.snapshot.draft.trim() === '' && this.imageIds.length > 0) {
-      if (this.snapshot.phase === 'plain') this.deps.defaultSink('', [...this.imageIds], mode)
+    if (this.snapshot.draft.trim() === '' && (this.imageIds.length > 0 || this.folderReferences.length > 0)) {
+      if (this.snapshot.phase === 'plain') this.deps.defaultSink(withFolderReferences('', this.folderReferences), [...this.imageIds], mode)
       return
     }
     this.run(this.core.dispatch({ type: 'enter', mode }))
@@ -415,9 +438,10 @@ export class SessionInputShell implements SessionInput {
    */
   private sinkSerialized(draft: string, mode: InputSubmitMode): void {
     const imageIds = [...this.imageIds]
+    const folderReferences = [...this.folderReferences]
     const occurrences = this.core.state.occurrences
     if (occurrences.length === 0) {
-      this.deps.defaultSink(draft.trim(), imageIds, mode)
+      this.deps.defaultSink(withFolderReferences(draft, folderReferences), imageIds, mode)
       return
     }
     const inputTriggers = this.deps.inputTriggers?.()
@@ -437,7 +461,7 @@ export class SessionInputShell implements SessionInput {
           cursor = part.offset + 1
         }
         out += draft.slice(cursor)
-        this.deps.defaultSink(out.trim(), imageIds, mode)
+        this.deps.defaultSink(withFolderReferences(out, folderReferences), imageIds, mode)
       },
       (error: unknown) => {
         controller.abort()
@@ -495,7 +519,12 @@ export class SessionInputShell implements SessionInput {
 
   private compose(): InputState {
     const core = this.core.state
-    return { ...core, imageIds: this.imageIds, queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE }
+    return {
+      ...core,
+      imageIds: this.imageIds,
+      folderReferences: this.folderReferences,
+      queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE,
+    }
   }
 
   private publish(): void {

@@ -49,7 +49,7 @@ export type {
   ModelReasoningEffort, ModelSelection, PromptContentPart, QueueAction, SessionModels,
   SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionsApi, SessionSummary,
 } from './sessions.ts'
-export type { DirectoryEntry, DirectoryListing, HostApi } from './host.ts'
+export type { DirectoryEntry, DirectoryFile, DirectoryFileEntry, DirectoryListing, HostApi } from './host.ts'
 export type { DesktopApi } from './desktop.ts'
 export type {
   SubagentAddress, SubagentCatalog, SubagentInterruptReceipt, SubagentListEntry,

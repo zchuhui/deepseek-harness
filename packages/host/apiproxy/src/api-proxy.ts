@@ -12,6 +12,7 @@ import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatu
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import { FileAttachmentError } from '@deepseek-ai/dsh-file-attachment'
 import { contentHasImage, createUserMessage, freezeMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import { errorChain } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
@@ -145,37 +146,61 @@ export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
 /** Conversation message event types (the pagination counting unit). */
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 
-/** Decode the browser payload while rejecting non-canonical base64 forms. */
-function decodeBase64(data: string): Uint8Array {
+/** Decode one browser attachment payload while retaining type-specific failures. */
+function decodeBase64(data: string, kind: 'image' | 'file'): Uint8Array {
   const decoded = Buffer.from(data, 'base64')
   if (data.length === 0 || decoded.toString('base64') !== data) {
-    throw new AttachmentError('Image upload is not canonical base64.', 'INVALID_IMAGE_BASE64')
+    if (kind === 'image') throw new AttachmentError('Image upload is not canonical base64.', 'INVALID_IMAGE_BASE64')
+    throw new FileAttachmentError('File upload is not canonical base64.', 'INVALID_FILE_BASE64')
   }
   return new Uint8Array(decoded)
 }
 
-/** Validate one prompt as a batch before publishing any durable image object. */
+/** Validate one prompt as a batch before publishing any durable attachment object. */
 async function durablePromptContent(ctx: Context, content: readonly PromptContentPart[]): Promise<ContentBlock[]> {
   if (content.every(part => part.type === 'text')) {
     return content.map(part => ({ type: 'text', text: part.text }))
   }
-  const limits = ctx.attachments.imageLimits
-  if (content.filter(part => part.type === 'image').length > limits.maxImagesPerMessage) {
+  const images = content.filter((part): part is Extract<PromptContentPart, { type: 'image' }> => part.type === 'image')
+  const files = content.filter((part): part is Extract<PromptContentPart, { type: 'file' }> => part.type === 'file')
+  const imageLimits = ctx.attachments.imageLimits
+  const fileAttachments = files.length === 0 ? undefined : ctx.get('fileAttachments')
+  if (files.length > 0) {
+    if (fileAttachments === undefined) {
+      throw new FileAttachmentError('This host does not support file attachments.', 'FILE_ATTACHMENTS_UNAVAILABLE')
+    }
+    if (files.length > fileAttachments.textFileLimits.maxFilesPerMessage) {
+      throw new FileAttachmentError('Prompt exceeds the configured file-count limit.', 'TOO_MANY_FILES')
+    }
+  }
+  if (images.length > imageLimits.maxImagesPerMessage) {
     throw new AttachmentError('Prompt exceeds the configured image-count limit.', 'TOO_MANY_IMAGES')
   }
   const prepared = content.map(part => part.type === 'text'
     ? part
-    : { part, data: decodeBase64(part.data) })
-  const images = prepared.filter((part): part is Extract<typeof part, { data: Uint8Array }> => 'data' in part)
-  const totalBytes = images.reduce((sum, image) => sum + image.data.byteLength, 0)
-  if (totalBytes > limits.maxMessageImageBytes) {
+    : { part, data: decodeBase64(part.data, part.type) })
+  const preparedImages = prepared.filter((item): item is { part: Extract<PromptContentPart, { type: 'image' }>; data: Uint8Array } => 'data' in item && item.part.type === 'image')
+  const preparedFiles = prepared.filter((item): item is { part: Extract<PromptContentPart, { type: 'file' }>; data: Uint8Array } => 'data' in item && item.part.type === 'file')
+  const imageBytes = preparedImages.reduce((sum, image) => sum + image.data.byteLength, 0)
+  if (imageBytes > imageLimits.maxMessageImageBytes) {
     throw new AttachmentError('Prompt exceeds the configured aggregate image-byte limit.', 'IMAGES_TOO_LARGE')
   }
-  for (const image of images) {
+  const fileBytes = preparedFiles.reduce((sum, file) => sum + file.data.byteLength, 0)
+  if (fileAttachments !== undefined && fileBytes > fileAttachments.textFileLimits.maxMessageFileBytes) {
+    throw new FileAttachmentError('Prompt exceeds the configured aggregate file-byte limit.', 'FILES_TOO_LARGE')
+  }
+  for (const image of preparedImages) {
     await ctx.attachments.validateImage({
       data: image.data,
       mediaType: image.part.mediaType,
       ...image.part.name === undefined ? {} : { name: image.part.name },
+    })
+  }
+  for (const file of preparedFiles) {
+    await fileAttachments?.validateTextFile({
+      data: file.data,
+      mediaType: file.part.mediaType,
+      ...file.part.name === undefined ? {} : { name: file.part.name },
     })
   }
   const blocks: ContentBlock[] = []
@@ -184,12 +209,24 @@ async function durablePromptContent(ctx: Context, content: readonly PromptConten
       blocks.push({ type: 'text', text: item.text })
       continue
     }
-    const attachment = await ctx.attachments.saveImage({
-      data: item.data,
-      mediaType: item.part.mediaType,
-      ...item.part.name === undefined ? {} : { name: item.part.name },
-    })
-    blocks.push({ type: 'image', attachment })
+    if (item.part.type === 'image') {
+      const attachment = await ctx.attachments.saveImage({
+        data: item.data,
+        mediaType: item.part.mediaType,
+        ...item.part.name === undefined ? {} : { name: item.part.name },
+      })
+      blocks.push({ type: 'image', attachment })
+    } else {
+      const attachment = await fileAttachments?.saveTextFile({
+        data: item.data,
+        mediaType: item.part.mediaType,
+        ...item.part.name === undefined ? {} : { name: item.part.name },
+      })
+      if (attachment === undefined) {
+        throw new FileAttachmentError('This host does not support file attachments.', 'FILE_ATTACHMENTS_UNAVAILABLE')
+      }
+      blocks.push({ type: 'file', attachment })
+    }
   }
   return blocks
 }
@@ -2514,6 +2551,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           ...(canonicalTimeZone === undefined ? {} : { clientTimeZone: canonicalTimeZone }),
         }
         const hasImage = content.some(part => part.type === 'image')
+        const hasFile = content.some(part => part.type === 'file')
         const admit = async (): Promise<RpcResponse<{ accepted: true }>> => {
           try {
             if (hasImage) {
@@ -2532,7 +2570,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             if (mode === 'steer') agent.steer(message)
             else agent.followup(message)
           } catch (error: unknown) {
-            if (error instanceof AttachmentError) {
+            if (error instanceof AttachmentError || error instanceof FileAttachmentError) {
               return err(request, {
                 code: 'attachment-error',
                 message: error.message,
@@ -2547,7 +2585,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           }
           return ok(request, { accepted: true as const })
         }
-        return hasImage ? serializeImageAdmission(agent, admit) : admit()
+        return hasImage || hasFile ? serializeImageAdmission(agent, admit) : admit()
       },
 
       async attachment(request) {
@@ -3018,6 +3056,25 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // failure — same code pickDirectory and command.execute report.
           if (signal.aborted) {
             return err(request, { code: 'cancelled', message: 'directory listing was aborted', details: {} })
+          }
+          return err(request, directoryError(error))
+        }
+      },
+
+      async readDirectoryFile(request, signal) {
+        const capability = ctx.directoryPicker.capability()
+        if (capability.kind !== 'browse') {
+          return err(request, {
+            code: 'directory-picker-unavailable',
+            message: `host.readDirectoryFile needs the browse capability; the composed picker serves "${capability.kind}"`,
+            details: { capability: capability.kind },
+          })
+        }
+        try {
+          return ok(request, await capability.readFile(request.payload.path, signal))
+        } catch (error: unknown) {
+          if (signal.aborted) {
+            return err(request, { code: 'cancelled', message: 'directory file read was aborted', details: {} })
           }
           return err(request, directoryError(error))
         }
@@ -3743,6 +3800,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           sessionQuery: deps.sessionQuery,
           sessionPersistence: deps.sessionPersistence,
           attachments: deps.attachments,
+          fileAttachments: deps.fileAttachments,
           sessions: deps.sessions,
         }
         let root: SessionRawArtifact | undefined

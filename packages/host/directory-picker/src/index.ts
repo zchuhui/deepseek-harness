@@ -34,6 +34,24 @@ export interface DirectoryEntry {
   hidden: boolean
 }
 
+/** One regular file row that an in-app picker may attach to a prompt. */
+export interface DirectoryFileEntry extends DirectoryEntry {
+  /** File size in bytes, used by the client to explain unavailable files. */
+  size: number
+  /** Browser media type inferred from the host file name; absent when unsupported. */
+  mediaType?: string
+}
+
+/** Bytes of a file the operator explicitly selected in an in-app browser. */
+export interface DirectoryFile {
+  /** Leaf name, never a host path. */
+  name: string
+  /** Browser media type inferred from the host file name. */
+  mediaType: string
+  /** Base64-encoded bytes. */
+  data: string
+}
+
 /** One directory level plus its ancestry, as a browse backend reports it. */
 export interface DirectoryListing {
   /** Absolute path of the listed directory. */
@@ -47,6 +65,8 @@ export interface DirectoryListing {
   crumbs: DirectoryEntry[]
   /** Direct child directories, name-sorted; symlinks to directories included. */
   entries: DirectoryEntry[]
+  /** Direct child regular files, name-sorted. Unsupported files remain visible but cannot be selected. */
+  files?: DirectoryFileEntry[]
   /**
    * True when the backend cut `entries` at its complete-result bound: the
    * level has more child directories than reported, and the missing rows are
@@ -75,6 +95,15 @@ export interface DirectoryPickerBrowseCapability {
    * Windows, its current drive) or cannot be listed.
    */
   list(path?: string, signal?: AbortSignal): Promise<DirectoryListing>
+  /**
+   * Read one previously displayed supported file. The caller must pass the
+   * exact absolute row path returned by {@link list}; implementations refuse
+   * directories, unsupported types, and oversized files.
+   * @param path - absolute file path from a listing row.
+   * @param signal - caller lifetime.
+   * @returns the leaf name, inferred media type, and base64 bytes.
+   */
+  readFile(path: string, signal?: AbortSignal): Promise<DirectoryFile>
   /**
    * Create one child directory under an existing parent.
    * @param path - absolute existing parent directory.

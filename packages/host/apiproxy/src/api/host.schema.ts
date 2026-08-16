@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod'
-import type { DirectoryEntry } from './host.ts'
+import type { DirectoryEntry, DirectoryFileEntry } from './host.ts'
 import type { RequestPayload, ResponseValue } from './rpc-map.ts'
 import type { Wire } from './rpc.schema.ts'
 
@@ -35,6 +35,12 @@ export const directoryEntrySchema = z.object({
   hidden: z.boolean(),
 }) satisfies z.ZodType<Wire<DirectoryEntry>>
 
+/** File row returned alongside the directory rows. */
+export const directoryFileEntrySchema = directoryEntrySchema.extend({
+  size: z.number().int().nonnegative(),
+  mediaType: z.string().optional(),
+}) satisfies z.ZodType<Wire<DirectoryFileEntry>>
+
 /** host.listDirectory request payload; an absent path lists the home directory. */
 export const hostListDirectoryRequestSchema = z.object({
   path: z.string().optional(),
@@ -46,8 +52,21 @@ export const hostListDirectoryValueSchema = z.object({
   home: z.string(),
   crumbs: z.array(directoryEntrySchema),
   entries: z.array(directoryEntrySchema),
+  files: z.array(directoryFileEntrySchema).optional(),
   truncated: z.boolean(),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.listDirectory'>>>
+
+/** host.readDirectoryFile request payload. */
+export const hostReadDirectoryFileRequestSchema = z.object({
+  path: z.string().min(1),
+}) satisfies z.ZodType<Wire<RequestPayload<'host.readDirectoryFile'>>>
+
+/** host.readDirectoryFile response value. */
+export const hostReadDirectoryFileValueSchema = z.object({
+  name: z.string(),
+  mediaType: z.string(),
+  data: z.string(),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.readDirectoryFile'>>>
 
 /** host.createDirectory request payload: name must be one plain path segment. */
 export const hostCreateDirectoryRequestSchema = z.object({

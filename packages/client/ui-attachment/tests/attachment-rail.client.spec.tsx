@@ -69,6 +69,27 @@ describe('AttachmentRail', () => {
     expect(onRemove).toHaveBeenCalledWith(items[1])
   })
 
+  it('renders a text-file card without attempting to open an image preview', () => {
+    const onOpen = vi.fn()
+    const onRemove = vi.fn()
+    const file: AttachmentRailItem = {
+      id: 'notes',
+      kind: 'file',
+      label: 'notes.md',
+      detail: 'MD · 2 KB',
+      removeLabel: '移除文件 notes.md',
+    }
+    const view = render(<AttachmentRail items={[file]} labels={labels} onOpen={onOpen} onRemove={onRemove} />)
+
+    expect(view.getByText('notes.md')).toBeTruthy()
+    expect(view.getByText('MD · 2 KB')).toBeTruthy()
+    expect(view.container.querySelector('[aria-hidden="true"] svg')).toBeTruthy()
+    expect(view.queryByTitle('查看原图')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: '移除文件 notes.md' }))
+    expect(onRemove).toHaveBeenCalledWith(file)
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
   it('shows edge arrows from scroll geometry and pages a viewport at a time', () => {
     const view = render(
       <AttachmentRail items={[item('a'), item('b'), item('c')]} labels={labels} onOpen={vi.fn()} onRemove={vi.fn()} />,

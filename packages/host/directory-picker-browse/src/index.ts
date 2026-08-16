@@ -9,7 +9,7 @@
  * @module @deepseek-ai/dsh-host-directory-picker-browse
  */
 
-import { mkdir, opendir, stat } from 'node:fs/promises'
+import { mkdir, opendir, readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join, posix, resolve, win32 } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -18,8 +18,20 @@ import {
   DirectoryPicker, DirectoryPickerError,
 } from '@deepseek-ai/dsh-host-directory-picker'
 import type {
-  DirectoryEntry, DirectoryListing, DirectoryPickerCapability,
+  DirectoryEntry, DirectoryFile, DirectoryFileEntry, DirectoryListing, DirectoryPickerCapability,
 } from '@deepseek-ai/dsh-host-directory-picker'
+
+const MEDIA_TYPES: Readonly<Record<string, string>> = {
+  '.gif': 'image/gif', '.jpeg': 'image/jpeg', '.jpg': 'image/jpeg', '.json': 'application/json',
+  '.md': 'text/markdown', '.png': 'image/png', '.txt': 'text/plain', '.webp': 'image/webp',
+  '.yaml': 'application/yaml', '.yml': 'application/yaml',
+}
+
+/** Media type accepted by the composer for a leaf name, if any. */
+function supportedMediaType(name: string): string | undefined {
+  const dot = name.lastIndexOf('.')
+  return dot < 0 ? undefined : MEDIA_TYPES[name.slice(dot).toLowerCase()]
+}
 
 /**
  * Ancestor chain from the filesystem root to `target` inclusive — the
@@ -181,6 +193,8 @@ async function directoryRow(
 export interface Config {
   /** Complete-result bound of one listing level; see {@link BrowseDirectoryPicker.Config}. */
   maxEntries: number
+  /** Maximum selected file size served to the browser. */
+  maxFileBytes: number
 }
 
 /** The `ctx.directoryPicker` browse implementation (stable capability object per service life). */
@@ -194,11 +208,13 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
    */
   static Config: z<Config> = z.object({
     maxEntries: z.natural().min(1).default(1000),
+    maxFileBytes: z.natural().min(1).default(10 * 1024 * 1024),
   })
 
   private readonly browseCapability: DirectoryPickerCapability = {
     kind: 'browse',
     list: (path, signal) => this.list(path, signal),
+    readFile: (path, signal) => this.readFile(path, signal),
     createDirectory: (path, name) => this.createDirectory(path, name),
   }
 
@@ -232,6 +248,7 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
     // level truncated, which stays the honest answer.
     const keep = this.config.maxEntries + 1
     const window: ListingCandidate[] = []
+    const files: DirectoryFileEntry[] = []
     let evicted = false
     try {
       // Every filesystem await races the caller's signal: a stalled
@@ -256,7 +273,14 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
           if (dirent === null) break
           // Only rows a browser could enter contend for the window; dirent
           // says "directory" outright, a symlink needs the later stat probe.
-          if (!dirent.isDirectory() && !dirent.isSymbolicLink()) continue
+          if (!dirent.isDirectory() && !dirent.isSymbolicLink()) {
+            if (dirent.isFile()) {
+              const mediaType = supportedMediaType(dirent.name)
+              const info = await raceAbort(stat(join(target, dirent.name)), signal)
+              files.push({ name: dirent.name, path: join(target, dirent.name), hidden: dirent.name.startsWith('.'), size: info.size, ...(mediaType === undefined ? {} : { mediaType }) })
+            }
+            continue
+          }
           const candidate = { name: dirent.name, isDirectory: dirent.isDirectory(), isSymbolicLink: dirent.isSymbolicLink() }
           if (boundedInsert(window, candidate, keep)) evicted = true
         }
@@ -293,7 +317,31 @@ export default class BrowseDirectoryPicker extends DirectoryPicker {
       }
       entries.push(row)
     }
-    return { path: target, home, crumbs: ancestryCrumbs(target), entries, truncated }
+    files.sort((left, right) => left.name.localeCompare(right.name))
+    return { path: target, home, crumbs: ancestryCrumbs(target), entries, files, truncated }
+  }
+
+  /** Read one supported regular file for an explicit in-app selection. */
+  private async readFile(path: string, signal?: AbortSignal): Promise<DirectoryFile> {
+    if (!fullyQualified(path)) {
+      throw new DirectoryPickerError('directory-unreadable', path, `cannot read "${path}": not a fully qualified path`)
+    }
+    const mediaType = supportedMediaType(path)
+    if (mediaType === undefined) {
+      throw new DirectoryPickerError('directory-unreadable', path, `cannot read "${path}": unsupported file type`)
+    }
+    try {
+      const info = await raceAbort(stat(path), signal)
+      if (!info.isFile() || info.size > this.config.maxFileBytes) {
+        throw new DirectoryPickerError('directory-unreadable', path, `cannot read "${path}": file is unavailable`)
+      }
+      const bytes = await raceAbort(readFile(path), signal)
+      return { name: basename(path), mediaType, data: bytes.toString('base64') }
+    } catch (error: unknown) {
+      signal?.throwIfAborted()
+      if (error instanceof DirectoryPickerError) throw error
+      throw new DirectoryPickerError('directory-unreadable', path, `cannot read ${path}: ${messageOf(error)}`)
+    }
   }
 
   private async createDirectory(path: string, name: string): Promise<string> {

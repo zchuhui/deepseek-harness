@@ -32,6 +32,12 @@
   height: 64px;
 }
 
+.fileItem {
+  flex: 0 0 auto;
+  width: auto;
+  height: 36px;
+}
+
 .thumbnail {
   width: 64px;
   height: 64px;
@@ -48,6 +54,60 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  width: min(236px, 55vw);
+  height: 36px;
+  padding: 4px 30px 4px 6px;
+  overflow: hidden;
+  color: var(--dsw-alias-text-primary);
+  background: var(--dsw-alias-fill-tertiary);
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 10px;
+}
+
+.fileIcon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 7px;
+  border-radius: 6px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.fileIcon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.fileText {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.fileName,
+.fileDetail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileName {
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.fileDetail {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 10px;
+  line-height: 12px;
 }
 
 .remove {
@@ -72,6 +132,12 @@
 .item:hover .remove,
 .remove:focus-visible {
   opacity: 1;
+}
+
+.fileItem .remove {
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
 }
 
 /* Touch surfaces have no hover to reveal the control. */

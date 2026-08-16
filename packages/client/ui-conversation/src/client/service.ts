@@ -60,12 +60,12 @@ export interface IConversation {
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
 function browserDraftAttachment(file: File): ComposerAttachment {
-  return {
-    kind: 'image',
-    id: crypto.randomUUID() as DraftAttachmentId,
-    previewUrl: URL.createObjectURL(file),
-    file,
+  const id = crypto.randomUUID() as DraftAttachmentId
+  if (isImageMediaType(file.type)) {
+    return { kind: 'image', id, previewUrl: URL.createObjectURL(file), file }
   }
+  if (isTextFileMediaType(file.type)) return { kind: 'file', id, file }
+  throw new UnsupportedAttachmentMediaTypeError(file.type)
 }
 
 interface ImageUrlEntry {
@@ -74,15 +74,15 @@ interface ImageUrlEntry {
   readonly pending: Promise<string>
 }
 
-/** Unsupported browser-declared image type, localized by the UI boundary. */
-export class UnsupportedImageMediaTypeError extends Error {
+/** Unsupported browser-declared attachment type, localized by the UI boundary. */
+export class UnsupportedAttachmentMediaTypeError extends Error {
   /** Browser-declared MIME value, possibly empty. */
   readonly mediaType: string
 
   /** @param mediaType - Browser-declared MIME value, possibly empty. */
   constructor(mediaType: string) {
-    super(`unsupported image media type: ${mediaType || '(empty)'}`)
-    this.name = 'UnsupportedImageMediaTypeError'
+    super(`unsupported attachment media type: ${mediaType || '(empty)'}`)
+    this.name = 'UnsupportedAttachmentMediaTypeError'
     this.mediaType = mediaType
   }
 }
@@ -133,7 +133,7 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /**
-   * Submit ordered draft images with text through one host admission.
+   * Submit ordered draft attachments with text through one host admission.
    * @param session - target session.
    * @param text - serialized prompt text.
    * @param imageIds - ordered draft-local attachment ids.
@@ -147,9 +147,9 @@ export class ConversationController extends Service implements IConversation {
   ): Promise<void> {
     const attachments = this.draftImages(imageIds)
     if (attachments.length !== imageIds.length) {
-      throw new Error('conversation.sendSession: one or more draft images are no longer available')
+      throw new Error('conversation.sendSession: one or more draft attachments are no longer available')
     }
-    const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
+    const uploaded = await this.serializeAttachments(attachments)
     const content = [...uploaded, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
     const result = await session.prompt(content, mode)
     if (!result.ok) throw new Error(`conversation.send failed: ${result.error.code}: ${result.error.message}`)
@@ -162,11 +162,15 @@ export class ConversationController extends Service implements IConversation {
    * @returns ordered draft descriptors.
    */
   createDraftImages(files: readonly File[]): readonly ComposerAttachment[] {
-    for (const file of files) imageMediaType(file.type)
+    for (const file of files) {
+      if (!isImageMediaType(file.type) && !isTextFileMediaType(file.type)) {
+        throw new UnsupportedAttachmentMediaTypeError(file.type)
+      }
+    }
     return files.map((file) => {
       const attachment = browserDraftAttachment(file)
       this.draftAttachments.set(attachment.id, attachment)
-      this.createdImageUrls.add(attachment.previewUrl)
+      if (attachment.kind === 'image') this.createdImageUrls.add(attachment.previewUrl)
       return attachment
     })
   }
@@ -193,8 +197,10 @@ export class ConversationController extends Service implements IConversation {
     const attachment = this.draftAttachments.get(id)
     if (attachment === undefined) return
     this.draftAttachments.delete(id)
-    this.createdImageUrls.delete(attachment.previewUrl)
-    revokePreview(attachment.previewUrl)
+    if (attachment.kind === 'image') {
+      this.createdImageUrls.delete(attachment.previewUrl)
+      revokePreview(attachment.previewUrl)
+    }
   }
 
   /**
@@ -312,27 +318,30 @@ export class ConversationController extends Service implements IConversation {
     return sessions
   }
 
-  /** Convert browser files to canonical base64 prompt parts. */
-  private serializeImages(images: readonly File[]): Promise<Parameters<SessionFace['prompt']>[0]> {
-    return Promise.all(images.map(async file => ({
-      type: 'image' as const,
-      mediaType: imageMediaType(file.type),
-      data: bytesToBase64(new Uint8Array(await file.arrayBuffer())),
-      ...(file.name === '' ? {} : { name: file.name }),
-    })))
+  /** Convert browser attachment drafts to canonical base64 prompt parts. */
+  private serializeAttachments(attachments: readonly ComposerAttachment[]): Promise<Parameters<SessionFace['prompt']>[0]> {
+    return Promise.all(attachments.map(async (attachment) => {
+      const data = bytesToBase64(new Uint8Array(await attachment.file.arrayBuffer()))
+      const name = attachment.file.name === '' ? {} : { name: attachment.file.name }
+      return attachment.kind === 'image'
+        ? { type: 'image' as const, mediaType: imageMediaType(attachment.file.type), data, ...name }
+        : { type: 'file' as const, mediaType: attachment.file.type, data, ...name }
+    }))
   }
 }
 
+function isImageMediaType(value: string): value is ImageMediaType {
+  return value === 'image/png' || value === 'image/jpeg' || value === 'image/webp' || value === 'image/gif'
+}
+
+function isTextFileMediaType(value: string): boolean {
+  return value === 'text/plain' || value === 'text/markdown' || value === 'application/json'
+    || value === 'application/yaml' || value === 'text/yaml'
+}
+
 function imageMediaType(value: string): ImageMediaType {
-  switch (value) {
-    case 'image/png':
-    case 'image/jpeg':
-    case 'image/webp':
-    case 'image/gif':
-      return value
-    default:
-      throw new UnsupportedImageMediaTypeError(value)
-  }
+  if (isImageMediaType(value)) return value
+  throw new UnsupportedAttachmentMediaTypeError(value)
 }
 
 function bytesToBase64(data: Uint8Array): string {

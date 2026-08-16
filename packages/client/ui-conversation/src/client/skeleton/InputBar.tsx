@@ -8,12 +8,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { DirectoryListing } from '@deepseek-ai/dsh-client-connection/client'
 import clsx from 'clsx'
 import {
+  IconChevronRightOutline14, IconCloseFill14, IconFolderClose16, IconFolderOpen16, IconFolderOpenOutline16,
   IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { AttachmentRail, DropOverlay, ImageLightbox } from '@deepseek-ai/dsh-client-ui-attachment'
-import type { AttachmentRailItem } from '@deepseek-ai/dsh-client-ui-attachment'
+import { DropOverlay, ImageLightbox } from '@deepseek-ai/dsh-client-ui-attachment'
 // Type-only: the `plan` projection key merge (the TodoDock posture — the
 // composer reads a host-computed value; the domain owns the key).
 import type {} from '@deepseek-ai/dsh-plan-mode/client'
@@ -27,7 +28,7 @@ import type { ComposerAttachment, ComposerBarProps } from '../contract/slots.ts'
 import { deriveDecorations } from '../input/decorations.ts'
 import type { DraftDecorations } from '../input/decorations.ts'
 import {
-  attachmentErrorText, attachmentRailLabels, dropOverlayLabels, imageSizeText, lightboxLabels,
+  attachmentErrorText, dropOverlayLabels, imageSizeText, lightboxLabels,
 } from '../image-labels.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
@@ -36,15 +37,10 @@ import css from './InputBar.module.css'
 /** Decoration product of the no-session state (no machine, empty draft). */
 const INERT_DECORATIONS: DraftDecorations = { token: null, chips: [], textRefs: [], hint: null }
 
-/** Rail thumbnail carrying its source attachment for the open/remove callbacks. */
-interface ComposerRailItem extends AttachmentRailItem {
-  attachment: ComposerAttachment
-}
-
 export type InputBarProps = ComposerBarProps
 
 export function InputBar({
-  useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages,
+  useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages, browseDirectory, readDirectoryFile,
   resolveSubmitMode, toggleCommandMenu, stop, command, t,
   renderSlot, useNotices, useLexicon, useMenuLauncher,
   useProjection, sessionId, variant, disabled: inert = false, blocked,
@@ -72,8 +68,9 @@ export function InputBar({
     () => input === undefined || draftImages === undefined ? [] : draftImages(input.imageIds),
     [draftImages, input?.imageIds],
   )
-  const empty = draft.trim() === '' && attachments.length === 0
-  const [preview, setPreview] = useState<ComposerAttachment | null>(null)
+  const folderReferences = input?.folderReferences ?? []
+  const empty = draft.trim() === '' && attachments.length === 0 && folderReferences.length === 0
+  const [preview, setPreview] = useState<Extract<ComposerAttachment, { kind: 'image' }> | null>(null)
   const [dragActive, setDragActive] = useState(false)
   // Transient error banner (image-intake rejections and prompt failures): the
   // seq keys the Toast so an identical repeated message restarts the
@@ -106,6 +103,12 @@ export function InputBar({
   const dragDepthRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const mirrorRef = useRef<HTMLDivElement | null>(null)
+  const [directoryTree, setDirectoryTree] = useState<{
+    readonly listings: ReadonlyMap<string, DirectoryListing>
+    readonly expanded: ReadonlySet<string>
+    readonly selected: ReadonlySet<string>
+  } | null>(null)
+  const [directoryBusy, setDirectoryBusy] = useState(false)
   // IME guard: composition Enter picks a candidate, it must not send. The ref outlives renders;
   // clearing is deferred one tick because Safari delivers the closing keydown AFTER compositionend.
   const composingRef = useRef(false)
@@ -199,7 +202,6 @@ export function InputBar({
   const revealSelectionFocus = (el: HTMLTextAreaElement): void => {
     // selectionStart/End are number|null in lib.dom; the type-aware lint program narrows them.
     const caret = el.selectionDirection === 'backward' ? el.selectionStart : el.selectionEnd
-    // oxlint-disable-next-line typescript/no-unnecessary-condition
     revealCaret(caret ?? el.value.length)
   }
 
@@ -282,7 +284,6 @@ export function InputBar({
     // IME guard so a composition-closing Shift+Enter still breaks the line.
     if (e.key === 'Enter' && e.shiftKey) return
     // keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
-    // oxlint-disable-next-line typescript/no-deprecated
     const composing = composingRef.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       if (keyboard.arbitrate(e.key === 'ArrowUp' ? 'up' : 'down', composing) === 'consumed') e.preventDefault()
@@ -345,7 +346,6 @@ export function InputBar({
     const next = e.target.value
     keyboard.setDraft(next)
     // selectionStart is number|null in lib.dom; the type-aware lint program narrows it.
-    // oxlint-disable-next-line typescript/no-unnecessary-condition
     keyboard.track(next, e.target.selectionStart ?? next.length)
   }
 
@@ -358,12 +358,10 @@ export function InputBar({
   // backdrop click handler below. Undo/redo must NOT reach the browser: the
   // machine owns the transaction log.
   // selectionStart/End are number|null in lib.dom; the type-aware lint program narrows them.
-  /* oxlint-disable typescript/no-unnecessary-condition */
   const selectionOf = (el: HTMLTextAreaElement) => ({
     start: el.selectionStart ?? 0,
     end: el.selectionEnd ?? el.selectionStart ?? 0,
   })
-  /* oxlint-enable typescript/no-unnecessary-condition */
 
   const onCopyOrCut = (e: React.ClipboardEvent<HTMLTextAreaElement>, cut: boolean): void => {
     if (input === undefined || keyboard === undefined) return // absent machine: no draft can be copied or cut
@@ -397,7 +395,7 @@ export function InputBar({
       .filter(item => item.kind === 'file')
       .map(item => item.getAsFile())
       .filter((file): file is File => file !== null)
-    if (files.length > 0) intakeImages(files)
+    if (files.length > 0) intakeAttachments(files)
     const text = e.clipboardData.getData('text/plain')
     if (text === '') {
       if (files.length > 0) e.preventDefault()
@@ -421,24 +419,26 @@ export function InputBar({
   // never enters the rail — no more submit-time failure rolling the rail
   // back. The host enforces the same limits at submit for callers that bypass
   // this composer.
-  const intakeImages = useCallback((files: readonly File[]): void => {
+  const intakeAttachments = useCallback((files: readonly File[]): void => {
     if (addImages === undefined || files.length === 0) return
     const rejected = ((): string | null => {
       if (imageLimits !== undefined) {
         // Format precedes limits (DeepSeek Chat's filter order): a batch with
         // a non-image must announce the format problem, not a count or size
         // it could never pass anyway — addImages rejects it authoritatively.
-        if (files.some(file => !(imageLimits.mediaTypes as readonly string[]).includes(file.type))) {
+        const images = files.filter(file => (imageLimits.mediaTypes as readonly string[]).includes(file.type))
+        if (images.length === 0) {
           return addImages(files)
         }
-        if (attachments.length + files.length > imageLimits.maxImagesPerMessage) {
+        const attachedImages = attachments.filter(attachment => attachment.kind === 'image')
+        if (attachedImages.length + images.length > imageLimits.maxImagesPerMessage) {
           return t('image.tooMany', { count: imageLimits.maxImagesPerMessage })
         }
-        if (files.some(file => file.size > imageLimits.maxImageBytes)) {
+        if (images.some(file => file.size > imageLimits.maxImageBytes)) {
           return t('image.fileTooLarge', { size: imageSizeText(imageLimits.maxImageBytes) })
         }
-        const total = attachments.reduce((sum, attachment) => sum + attachment.file.size, 0)
-          + files.reduce((sum, file) => sum + file.size, 0)
+        const total = attachedImages.reduce((sum, attachment) => sum + attachment.file.size, 0)
+          + images.reduce((sum, file) => sum + file.size, 0)
         if (total > imageLimits.maxMessageImageBytes) {
           return t('image.totalTooLarge', { size: imageSizeText(imageLimits.maxMessageImageBytes) })
         }
@@ -447,6 +447,84 @@ export function InputBar({
     })()
     if (rejected !== null) showToast(rejected)
   }, [addImages, attachments, imageLimits, showToast, t])
+
+  const openDirectoryTree = useCallback(() => {
+    if (browseDirectory === undefined) return
+    setDirectoryBusy(true)
+    void browseDirectory().then((listing) => {
+      setDirectoryTree({ listings: new Map([[listing.path, listing]]), expanded: new Set([listing.path]), selected: new Set() })
+    }).catch((error: unknown) => {
+      showToast(error instanceof Error ? error.message : String(error))
+    }).finally(() => { setDirectoryBusy(false) })
+  }, [browseDirectory, showToast])
+
+  const toggleDirectory = useCallback((path: string) => {
+    if (directoryTree === null || browseDirectory === undefined) return
+    if (directoryTree.expanded.has(path)) {
+      setDirectoryTree(current => current === null
+        ? null
+        : { ...current, expanded: new Set([...current.expanded].filter(value => value !== path)) })
+      return
+    }
+    const reveal = (listing: DirectoryListing): void => {
+      setDirectoryTree(current => current === null ? null : {
+        ...current, listings: new Map([...current.listings, [listing.path, listing]]), expanded: new Set([...current.expanded, path]),
+      })
+    }
+    const cached = directoryTree.listings.get(path)
+    if (cached !== undefined) reveal(cached)
+    else {
+      setDirectoryBusy(true)
+      void browseDirectory(path).then(reveal).catch((error: unknown) => {
+        showToast(error instanceof Error ? error.message : String(error))
+      }).finally(() => { setDirectoryBusy(false) })
+    }
+  }, [browseDirectory, directoryTree, showToast])
+
+  const toggleDirectoryFile = useCallback((path: string) => {
+    setDirectoryTree((current) => {
+      if (current === null) return null
+      const selected = new Set(current.selected)
+      if (selected.has(path)) selected.delete(path)
+      else selected.add(path)
+      return { ...current, selected }
+    })
+  }, [])
+
+  const addDirectoryFiles = useCallback(() => {
+    const setFolderReferences = inputActions?.setFolderReferences
+    if (directoryTree === null || readDirectoryFile === undefined || addImages === undefined || setFolderReferences === undefined) return
+    const directFiles = new Set<string>()
+    const folders = [] as { path: string; name: string }[]
+    for (const listing of directoryTree.listings.values()) {
+      for (const file of listing.files ?? []) {
+        if (directoryTree.selected.has(file.path)) directFiles.add(file.path)
+      }
+      for (const entry of listing.entries) {
+        if (directoryTree.selected.has(entry.path)) folders.push({ path: entry.path, name: entry.name })
+      }
+    }
+    if (directFiles.size === 0 && folders.length === 0) return
+    if (directFiles.size === 0) {
+      setFolderReferences(folders)
+      setDirectoryTree(null)
+      return
+    }
+    setDirectoryBusy(true)
+    void Promise.all([...directFiles].map(path => readDirectoryFile(path))).then((files) => {
+      const rejected = addImages(files.map((file) => {
+        const bytes = base64Bytes(file.data)
+        return new File([bytes.buffer as ArrayBuffer], file.name, { type: file.mediaType })
+      }))
+      if (rejected !== null) showToast(rejected)
+      else {
+        setFolderReferences(folders)
+        setDirectoryTree(null)
+      }
+    }).catch((error: unknown) => {
+      showToast(error instanceof Error ? error.message : String(error))
+    }).finally(() => { setDirectoryBusy(false) })
+  }, [addImages, directoryTree, inputActions, readDirectoryFile, showToast])
 
   // Whole-page file-drop intake (DeepSeek Chat behavior): the listeners live
   // on the document so a drop anywhere over the window adds images, not only
@@ -489,7 +567,7 @@ export function InputBar({
       event.preventDefault()
       reset()
       if (!canAcceptDrop) return
-      intakeImages([...(event.dataTransfer?.files ?? [])])
+      intakeAttachments([...(event.dataTransfer?.files ?? [])])
     }
     document.addEventListener('dragenter', onDragEnter)
     document.addEventListener('dragover', onDragOver)
@@ -503,19 +581,9 @@ export function InputBar({
       document.removeEventListener('drop', onDrop)
       window.removeEventListener('dragend', reset)
     }
-  }, [canAcceptDrop, intakeImages])
+  }, [canAcceptDrop, intakeAttachments])
 
   const closePreview = useCallback(() => { setPreview(null) }, [])
-
-  // Rail thumbnails with their strings resolved here: the attachment atoms are
-  // zero-cordis and read no locale.
-  const railItems = useMemo<ComposerRailItem[]>(() => attachments.map(attachment => ({
-    id: attachment.id,
-    previewUrl: attachment.previewUrl,
-    alt: attachment.file.name || t('image.pending'),
-    removeLabel: t('image.remove', { name: attachment.file.name }),
-    attachment,
-  })), [attachments, t])
 
   const onSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>): void => {
     // Any caret/selection gesture ends a live paste attempt (the machine
@@ -676,14 +744,32 @@ export function InputBar({
       >
         {overlay !== undefined && <div className={css.overlayAnchor}>{overlay}</div>}
         {accessory !== undefined && <div className={css.accessory}>{accessory}</div>}
-        {railItems.length > 0 && (
-          <div className={css.attachments}>
-            <AttachmentRail
-              items={railItems}
-              labels={attachmentRailLabels(t)}
-              onOpen={(item) => { setPreview(item.attachment) }}
-              onRemove={(item) => { removeImage?.(item.attachment.id) }}
-            />
+        {(attachments.length > 0 || folderReferences.length > 0) && (
+          <div className={css.embeddedContext} role="group" aria-label={t('file.attachedGroup')}>
+            {folderReferences.map(folder => (
+              <div key={folder.path} className={css.embeddedContextItem} title={folder.path}>
+                <span className={css.embeddedContextIcon} aria-hidden><IconFolderOpenOutline16 /></span>
+                <span className={css.embeddedContextName}>{folder.name}</span>
+                <span className={css.embeddedContextKind}>{t('file.contextFolder')}</span>
+                <button type="button" className={css.embeddedContextRemove} aria-label={t('file.removeFolder', { name: folder.name })} onClick={() => { inputActions?.setFolderReferences?.(folderReferences.filter(reference => reference.path !== folder.path)) }}>
+                  <IconCloseFill14 size={12} />
+                </button>
+              </div>
+            ))}
+            {attachments.map(attachment => (
+              <div key={attachment.id} className={css.embeddedContextItem}>
+                {attachment.kind === 'image' ? (
+                  <button type="button" className={css.embeddedImage} title={t('image.openOriginal')} onClick={() => { setPreview(attachment) }}>
+                    <img src={attachment.previewUrl} alt={attachment.file.name || t('file.unnamed')} />
+                  </button>
+                ) : <span className={css.embeddedContextIcon} aria-hidden><FileGlyph /></span>}
+                <span className={css.embeddedContextName}>{attachment.file.name || t('file.unnamed')}</span>
+                <span className={css.embeddedContextKind}>{t('file.contextFile')}</span>
+                <button type="button" className={css.embeddedContextRemove} aria-label={t('image.remove', { name: attachment.file.name })} onClick={() => { removeImage?.(attachment.id) }}>
+                  <IconCloseFill14 size={12} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
         {/* One scrollport, two text layers. The hidden mirror renders draft+'\n' and stretches the
@@ -731,6 +817,18 @@ export function InputBar({
         </div>
         <div className={css.row}>
           <div className={css.tools}>
+            <Tooltip label={t('file.chooseDirectory')} side="top" delayMs={500}>
+              <button
+                type="button"
+                className={css.add}
+                aria-label={t('file.chooseDirectory')}
+                disabled={locked || machineBusy || addImages === undefined}
+                onMouseDown={keepFocus}
+                onClick={openDirectoryTree}
+              >
+                <IconFolderOpenOutline16 size={14} />
+              </button>
+            </Tooltip>
             <Tooltip label={t('input.commands')} side="top" delayMs={500}>
               <button
                 type="button"
@@ -802,7 +900,117 @@ export function InputBar({
           onClose={closePreview}
         />
       )}
+      {directoryTree !== null && (() => {
+        // The tree is always seeded with its root listing before first render.
+        const rootListing = [...directoryTree.listings.values()][0]
+        if (rootListing === undefined) return null
+        return (
+          <div className={css.directoryPickerBackdrop} role="presentation" onMouseDown={() => { if (!directoryBusy) setDirectoryTree(null) }}>
+            <section className={css.directoryPicker} role="dialog" aria-modal="true" aria-label={t('file.chooseDirectory')} onMouseDown={(event) => { event.stopPropagation() }}>
+              <header className={css.directoryPickerHeader}>
+                <div><strong>{t('file.chooseDirectory')}</strong><p>{t('file.directoryHint')}</p></div>
+                <button type="button" className={css.directoryPickerClose} aria-label={t('file.directoryClose')} disabled={directoryBusy} onClick={() => { setDirectoryTree(null) }}>×</button>
+              </header>
+              <div className={css.directoryPickerTree}>
+                <DirectoryRows
+                  listing={rootListing}
+                  listings={directoryTree.listings}
+                  expanded={directoryTree.expanded}
+                  selected={directoryTree.selected}
+                  depth={0}
+                  unsupportedFileLabel={t('file.unsupportedFile')}
+                  onToggleDirectory={toggleDirectory}
+                  onToggleFile={toggleDirectoryFile}
+                />
+              </div>
+              <footer className={css.directoryPickerFooter}>
+                <span>{t('file.directorySelected', { count: directoryTree.selected.size })}</span>
+                <div>
+                  <button type="button" className={css.directoryPickerCancel} disabled={directoryBusy} onClick={() => { setDirectoryTree(null) }}>{t('file.directoryCancel')}</button>
+                  <button type="button" className={css.directoryPickerAdd} disabled={directoryBusy || directoryTree.selected.size === 0} onClick={addDirectoryFiles}>{directoryBusy ? t('file.directoryLoading') : t('file.directoryAdd')}</button>
+                </div>
+              </footer>
+            </section>
+          </div>
+        )
+      })()}
       {footer}
     </div>
   )
+}
+
+interface DirectoryRowsProps {
+  listing: DirectoryListing
+  listings: ReadonlyMap<string, DirectoryListing>
+  expanded: ReadonlySet<string>
+  selected: ReadonlySet<string>
+  depth: number
+  unsupportedFileLabel: string
+  onToggleDirectory(path: string): void
+  onToggleFile(path: string): void
+}
+
+/** Render one expanded project directory and its checked file or folder leaves. */
+function DirectoryRows({
+  listing, listings, expanded, selected, depth, unsupportedFileLabel, onToggleDirectory, onToggleFile,
+}: DirectoryRowsProps) {
+  return <>
+    {listing.entries.map((entry) => {
+      const child = expanded.has(entry.path) ? listings.get(entry.path) : undefined
+      return (
+        <div key={entry.path}>
+          <div className={css.directoryPickerRow} style={{ paddingLeft: `${12 + depth * 18}px` }}>
+            <input type="checkbox" checked={selected.has(entry.path)} onChange={() => { onToggleFile(entry.path) }} />
+            <button type="button" className={css.directoryPickerFolder} onClick={() => { onToggleDirectory(entry.path) }}>
+              <IconChevronRightOutline14
+                className={clsx(css.directoryPickerChevron, expanded.has(entry.path) && css.directoryPickerChevronOpen)}
+              />
+              <span className={css.directoryPickerFolderIcon} aria-hidden>
+                {expanded.has(entry.path) ? <IconFolderOpen16 /> : <IconFolderClose16 />}
+              </span>
+              <span className={css.directoryPickerEntryName}>{entry.name}</span>
+            </button>
+          </div>
+          {child !== undefined && (
+            <DirectoryRows
+              listing={child}
+              listings={listings}
+              expanded={expanded}
+              selected={selected}
+              depth={depth + 1}
+              unsupportedFileLabel={unsupportedFileLabel}
+              onToggleDirectory={onToggleDirectory}
+              onToggleFile={onToggleFile}
+            />
+          )}
+        </div>
+      )
+    })}
+    {(listing.files ?? []).map(file => (
+      <label key={file.path} className={css.directoryPickerRow} style={{ paddingLeft: `${34 + depth * 18}px` }}>
+        <input type="checkbox" checked={selected.has(file.path)} disabled={file.mediaType === undefined} onChange={() => { onToggleFile(file.path) }} />
+        <span className={css.directoryPickerFileIcon} aria-hidden><FileGlyph /></span>
+        <span className={css.directoryPickerEntryName}>{file.name}</span>
+        <small>{file.mediaType === undefined ? unsupportedFileLabel : formatFileSize(file.size)}</small>
+      </label>
+    ))}
+  </>
+}
+
+function base64Bytes(value: string): Uint8Array {
+  const binary = atob(value)
+  return Uint8Array.from(binary, char => char.charCodeAt(0))
+}
+
+function formatFileSize(size: number): string {
+  return size < 1024 ? `${size} B` : `${Math.ceil(size / 1024)} KB`
+}
+
+
+/** Small document glyph for an inline file-context row. */
+function FileGlyph() {
+  return <svg viewBox="0 0 16 16" fill="none">
+    <path d="M3.25 1.75h5.1L12.75 6v8.25H3.25V1.75Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+    <path d="M8.25 1.75V6h4.5M5.5 9h5M5.5 11.5h3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
 }

@@ -12,10 +12,16 @@ import css from './AttachmentRail.module.css'
 export interface AttachmentRailItem {
   /** Stable identity for the React key. */
   id: string
-  /** Object or data URL rendered as the thumbnail. */
-  previewUrl: string
-  /** Image alt text (display name with the owner's fallback applied). */
-  alt: string
+  /** Renderer form; files intentionally have no preview URL. */
+  kind?: 'image' | 'file'
+  /** Object or data URL rendered as the image thumbnail. */
+  previewUrl?: string
+  /** Accessible name and file-card label. */
+  label?: string
+  /** Small, secondary file metadata such as its type and size. */
+  detail?: string
+  /** Legacy image alt text; owners should provide `label` for new cards. */
+  alt?: string
   /** Accessible label of the item's remove control. */
   removeLabel: string
 }
@@ -40,7 +46,6 @@ const WHEEL_LINE_PX = 16
 function pageBehavior(): ScrollBehavior {
   // jsdom (the unit lane) implements no matchMedia despite lib.dom's
   // non-optional typing; the optional call keeps that lane on the default.
-  // oxlint-disable-next-line typescript/no-unnecessary-condition
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 }
 
@@ -165,15 +170,30 @@ export function AttachmentRail<T extends AttachmentRailItem>({ items, labels, on
         onScroll={updateEdges}
       >
         {items.map(item => (
-          <div key={item.id} className={css.item}>
-            <button
-              type="button"
-              className={css.thumbnail}
-              title={labels.open}
-              onClick={() => { onOpen(item) }}
-            >
-              <img src={item.previewUrl} alt={item.alt} />
-            </button>
+          <div key={item.id} className={clsx(css.item, (item.kind ?? 'image') === 'file' && css.fileItem)}>
+            {(item.kind ?? 'image') === 'image' ? (
+              <button
+                type="button"
+                className={css.thumbnail}
+                title={labels.open}
+                onClick={() => { onOpen(item) }}
+              >
+                <img src={item.previewUrl} alt={item.label ?? item.alt ?? ''} />
+              </button>
+            ) : (
+              <div className={css.file} title={item.label ?? item.alt ?? ''}>
+                <span className={css.fileIcon} aria-hidden>
+                  <svg viewBox="0 0 16 16" fill="none">
+                    <path d="M3.25 1.75h5.1L12.75 6v8.25H3.25V1.75Z" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+                    <path d="M8.25 1.75V6h4.5M5.5 9h5M5.5 11.5h3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </span>
+                <span className={css.fileText}>
+                  <span className={css.fileName}>{item.label ?? item.alt ?? ''}</span>
+                  {item.detail !== undefined && <span className={css.fileDetail}>{item.detail}</span>}
+                </span>
+              </div>
+            )}
             <button
               type="button"
               className={css.remove}

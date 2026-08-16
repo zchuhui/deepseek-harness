@@ -24,6 +24,9 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../attachment/file-attachment"
+    },
+    {
       "path": "../../interaction/user-approval"
     },
     {

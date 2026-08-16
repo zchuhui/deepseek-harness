@@ -28,6 +28,7 @@ export const inject = ['tools', 'workspaceTodos', 'workspaceRegistry']
  * whether set-status calls on existing todos ask too.
  */
 export interface Config {
+  /** Required policy for set-status calls on existing workspace todos. */
   readonly statusUpdateApproval: TodosStatusApprovalPolicy
 }
 

@@ -1,5 +1,6 @@
 /** Registers the conversation components, shared store, and service callbacks. */
 import type { Context } from '@deepseek-ai/cordis'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { resolveSlotLabel, type BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   resolveWorkspacePath, type ISessions, type SessionId,
@@ -19,7 +20,7 @@ import type {
 } from './contract/slots.ts'
 import type { InputNotice } from './input/contract.ts'
 import { createChatStore, createWorkbenchStore } from './stores.ts'
-import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
+import { ConversationController, UnsupportedAttachmentMediaTypeError } from './service.ts'
 import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './input/blocks.ts'
@@ -118,6 +119,8 @@ export function apply(ctx: Context): void {
   const workspaces = ctx.workspaces
   const layout = ctx.layout
   const slots = ctx.slots
+  const connection = ctx.get('connection') as ConnectionHandle | undefined
+  if (connection === undefined) throw new Error('ui-conversation requires the connection service')
 
   registerConversationNodes(ctx)
   registerChatNodeRenderers(ctx)
@@ -239,6 +242,7 @@ export function apply(ctx: Context): void {
           const from = inputHub.shell(sessionId)
           const draft = from.snapshot.draft
           const imageIds = from.snapshot.imageIds
+          const folderReferences = from.snapshot.folderReferences ?? []
           const next = inputHub.shell(nextId)
           if (imageIds.length === 0 || next.addImages(imageIds)) {
             if (draft !== '') {
@@ -247,6 +251,10 @@ export function apply(ctx: Context): void {
             }
             if (imageIds.length > 0) {
               for (const id of imageIds) from.removeImage(id)
+            }
+            if (folderReferences.length > 0) {
+              next.setFolderReferences([...(next.snapshot.folderReferences ?? []), ...folderReferences])
+              from.setFolderReferences([])
             }
           }
         }
@@ -335,10 +343,10 @@ export function apply(ctx: Context): void {
             }
             return null
           } catch (error: unknown) {
-            if (error instanceof UnsupportedImageMediaTypeError) {
-              // Positive copy: the supported list is fixed in imageMediaType,
+            if (error instanceof UnsupportedAttachmentMediaTypeError) {
+              // Positive copy: the supported list is fixed at browser intake,
               // and naming it beats echoing the rejected MIME type back.
-              return t('image.unsupportedType')
+              return t('file.unsupportedType')
             }
             return error instanceof Error ? error.message : String(error)
           }
@@ -346,6 +354,25 @@ export function apply(ctx: Context): void {
         removeImage: (id) => {
           conversation.releaseDraftImage(id)
           shell.removeImage(id)
+        },
+        browseDirectory: async (path) => {
+          const target = path ?? (() => {
+            const description = connection.hostDescription.getSnapshot()
+            return description?.cwd
+          })()
+          const response = target === undefined
+            ? await connection.api.host.describe({}).then(async (description) => {
+              if (!description.result.ok) throw new Error(description.result.error.message)
+              return connection.api.host.listDirectory({ path: description.result.value.cwd })
+            })
+            : await connection.api.host.listDirectory({ path: target })
+          if (!response.result.ok) throw new Error(response.result.error.message)
+          return response.result.value
+        },
+        readDirectoryFile: async (path) => {
+          const response = await connection.api.host.readDirectoryFile({ path })
+          if (!response.result.ok) throw new Error(response.result.error.message)
+          return response.result.value
         },
         draftImages: ids => conversation.draftImages(ids),
         resolveSubmitMode: (running, gesture, steeringAvailable) =>

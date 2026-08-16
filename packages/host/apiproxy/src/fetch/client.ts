@@ -15,7 +15,7 @@ import { rpcReceiptSchema, serverRequestSchema, serverResponseSchema } from '../
 import { hostFrameSchema, muxFrameSchema } from '../api/events.schema.ts'
 import {
   hostCreateDirectoryValueSchema, hostDescribeValueSchema,
-  hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema,
+  hostListDirectoryValueSchema, hostOpenPathValueSchema, hostPickDirectoryValueSchema, hostReadDirectoryFileValueSchema,
   hostReportWindowValueSchema,
 } from '../api/host.schema.ts'
 import { desktopGetSettingsValueSchema, desktopSetSettingsValueSchema } from '../api/desktop.schema.ts'
@@ -111,6 +111,7 @@ export interface IApiClient {
     describe(payload: RequestPayload<'host.describe'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.describe'>>>
     pickDirectory(payload: RequestPayload<'host.pickDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.pickDirectory'>>>
     listDirectory(payload: RequestPayload<'host.listDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.listDirectory'>>>
+    readDirectoryFile(payload: RequestPayload<'host.readDirectoryFile'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.readDirectoryFile'>>>
     createDirectory(payload: RequestPayload<'host.createDirectory'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.createDirectory'>>>
     openPath(payload: RequestPayload<'host.openPath'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.openPath'>>>
     reportWindow(payload: RequestPayload<'host.reportWindow'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'host.reportWindow'>>>
@@ -196,6 +197,7 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'host.describe': hostDescribeValueSchema,
   'host.pickDirectory': hostPickDirectoryValueSchema,
   'host.listDirectory': hostListDirectoryValueSchema,
+  'host.readDirectoryFile': hostReadDirectoryFileValueSchema,
   'host.createDirectory': hostCreateDirectoryValueSchema,
   'host.openPath': hostOpenPathValueSchema,
   'host.reportWindow': hostReportWindowValueSchema,
@@ -449,6 +451,7 @@ export abstract class AbstractApiClient implements IApiClient {
       'host.pickDirectory', payload, signal, 'caller-signal-only',
     ),
     listDirectory: (payload, signal) => this.callUnary('host.listDirectory', payload, signal),
+    readDirectoryFile: (payload, signal) => this.callUnary('host.readDirectoryFile', payload, signal),
     createDirectory: (payload, signal) => this.callUnary('host.createDirectory', payload, signal),
     openPath: (payload, signal) => this.callUnary('host.openPath', payload, signal),
     reportWindow: (payload, signal) => this.callUnary('host.reportWindow', payload, signal),

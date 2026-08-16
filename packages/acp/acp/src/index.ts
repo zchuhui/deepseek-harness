@@ -177,6 +177,17 @@ export function apply(ctx: Context, config: AcpConfig): void {
                 },
               },
             })
+          } else if (block.type === 'file') {
+            notify({
+              sessionId: record.agent.session.id,
+              update: {
+                sessionUpdate: 'agent_message_chunk',
+                content: {
+                  type: 'text',
+                  text: `[file attachment ${block.attachment.attachmentId}]`,
+                },
+              },
+            })
           }
         }
       }

@@ -15,6 +15,19 @@ export interface DirectoryEntry {
   hidden: boolean
 }
 
+/** One regular file row returned by an in-app picker listing. */
+export interface DirectoryFileEntry extends DirectoryEntry {
+  size: number
+  mediaType?: string
+}
+
+/** Content of an explicitly selected supported file. */
+export interface DirectoryFile {
+  name: string
+  mediaType: string
+  data: string
+}
+
 /** host.listDirectory response value: one directory level plus its ancestry. */
 export interface DirectoryListing {
   /** Absolute path of the listed directory. */
@@ -28,6 +41,8 @@ export interface DirectoryListing {
   crumbs: DirectoryEntry[]
   /** Direct child directories, name-sorted; symlinks to directories included. */
   entries: DirectoryEntry[]
+  /** Direct child files, name-sorted. Unsupported types have no mediaType. */
+  files?: DirectoryFileEntry[]
   /** True when the backend cut `entries` at its complete-result bound (the name-sorted tail is absent). */
   truncated: boolean
 }
@@ -72,6 +87,12 @@ export interface HostApi {
     request: RpcRequest<{ path?: string }>,
     signal: AbortSignal,
   ): Promise<RpcResponse<DirectoryListing>>
+
+  /** Read a supported file selected from a host directory listing. */
+  readDirectoryFile(
+    request: RpcRequest<{ path: string }>,
+    signal: AbortSignal,
+  ): Promise<RpcResponse<DirectoryFile>>
 
   /**
    * Create one child directory under an existing parent (the browser's
