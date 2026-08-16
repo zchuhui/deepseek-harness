@@ -33,8 +33,9 @@ export type {
   ComposerAttachment, ComposerChainProps, ConversationInjected,
   ConversationSessionHeaderInjected, ConversationSessionInjected, ConversationSlotProps, ConvViewOwnerProps,
   ConvViewProps, DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, EmptyWorkspaceOwnerProps,
-  TurnTailOwnerProps, UseChatNodeTurnData,
+  TurnTailOwnerProps, UseChatNodeTurnData, WorkbenchInjected, WorkbenchSlotProps, WorkbenchTabOwnerProps,
 } from './contract/slots.ts'
+export type { WorkbenchState, WorkbenchTab } from './contract/workbench.ts'
 // Export discipline: packages/client/AGENTS.md.
 
 declare module '@deepseek-ai/cordis' {

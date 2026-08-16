@@ -1,0 +1,17 @@
+# Optional workspace-todos layer for the Web profile. It deliberately inserts
+# nothing into dsh-base or dsh-web-app: install this bundle only when a profile
+# should expose shared workspace todos.
+
+- insert:
+    - id: workspace-todos
+      name: '@deepseek-ai/dsh-workspace-todos'
+      config:
+        maxContentBytes: 4096
+
+    - id: workspace-todos-agent
+      name: '@deepseek-ai/dsh-workspace-todos-agent'
+      config:
+        statusUpdateApproval: ask
+
+    - id: ui-workspace-todos
+      name: '@deepseek-ai/dsh-client-ui-workspace-todos'

@@ -2,8 +2,9 @@
  * Per-session chat store shared by conversation and details registrations.
  * The plugin creates its handle at apply time so identity follows the fiber.
  */
-import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, defineStore, type EngineStoreHandle, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type { CallId, ChatStoreState, SelectionTarget } from './contract/views.ts'
+import type { WorkbenchState } from './contract/workbench.ts'
 
 /** Declared action shape used to give the exported factory a stable return type. */
 type ChatActions = {
@@ -31,4 +32,18 @@ export function createChatStore(): EngineStoreHandle<ChatStoreState, ChatActions
       setInspect: (d, target: { callId: CallId } | null) => { d.inspect = target },
     },
   })
+}
+
+/**
+ * Root-lifetime workbench tab memory (per-workspace last selection), created
+ * once in apply and consumed as a bare observable through the workbench
+ * host's inject hooks compartment — writes go through the injected callback,
+ * never the engine face.
+ * @returns the workbench memory store.
+ */
+export function createWorkbenchStore(): SnapshotStore<WorkbenchState> {
+  return createSnapshotStore<WorkbenchState>(
+    { activeTab: {} },
+    { persist: { name: 'dsh.conversation.workbench' } },
+  )
 }

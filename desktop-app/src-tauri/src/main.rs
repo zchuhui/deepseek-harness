@@ -59,15 +59,6 @@ fn main() {
             commands::set_settings
         ])
         .setup(|app| {
-            let port = std::env::var(runtime::ENV_PORT)
-                .ok()
-                .and_then(|value| value.parse().ok())
-                .unwrap_or(runtime::DEFAULT_PORT);
-            let bridge_port = std::env::var(bridge::ENV_BRIDGE_PORT)
-                .ok()
-                .and_then(|value| value.parse().ok())
-                .unwrap_or(bridge::DEFAULT_BRIDGE_PORT);
-
             // Load shell settings before anything consumes them; a corrupt
             // document fails loud with the error window instead of guessed behavior.
             let settings_dir = app
@@ -79,6 +70,11 @@ fn main() {
                 Ok(settings) => settings,
                 Err(error) => {
                     eprintln!("dsh-desktop: {error}");
+                    app.manage(settings::SettingsState::new(
+                        settings::Settings::default(),
+                        settings_file,
+                    ));
+                    app.manage(windows::WindowRegistry::new());
                     let window = WebviewWindowBuilder::new(
                         app,
                         windows::MAIN_LABEL,
@@ -92,6 +88,7 @@ fn main() {
                 }
             };
             app.manage(settings::SettingsState::new(settings, settings_file));
+            app.manage(windows::WindowRegistry::new());
 
             // Windows toast identity: the Start Menu shortcut registers the
             // shell's AppUserModelID, and toasts show under it. Registration
@@ -119,12 +116,11 @@ fn main() {
             app.manage(crate::toast::ToastAppId(toast_app_id));
 
             let token = bridge::generate_token();
+            let bridge_port = runtime::allocate_loopback_port()?;
             let bridge_url = format!("http://127.0.0.1:{bridge_port}");
             let handle = app.handle().clone();
             let _bridge = bridge::Bridge::start(handle, bridge_port, token.clone())?;
             std::mem::forget(_bridge); // lives for the application lifetime
-
-            app.manage(deeplink::WebPort(port));
 
             // Register the dsh protocol before reading boot links, so a
             // protocol launch of the primary instance sees its link.
@@ -156,15 +152,44 @@ fn main() {
                 }
             }
 
-            let start_dir = std::env::current_dir().unwrap_or_default();
-            let spec = runtime::resolve_launch_spec(port, &start_dir)?;
-            let mut manager = runtime::RuntimeManager::new(port, spec);
+            let web_token = bridge::generate_token();
             let env = [
                 (bridge::ENV_BRIDGE_URL, bridge_url.as_str()),
                 (bridge::ENV_BRIDGE_TOKEN, token.as_str()),
+                (runtime::ENV_WEB_TOKEN, web_token.as_str()),
             ];
-            let outcome = match manager.start(&env) {
-                Ok(outcome) => outcome,
+            let started = (|| -> Result<(u16, runtime::RuntimeManager), String> {
+                let attempts = if cfg!(debug_assertions) { 1 } else { 5 };
+                let mut last_error = "desktop runtime did not start".to_string();
+                for _ in 0..attempts {
+                    let port = if cfg!(debug_assertions) {
+                        std::env::var(runtime::ENV_PORT)
+                            .ok()
+                            .and_then(|value| value.parse().ok())
+                            .unwrap_or(runtime::DEFAULT_PORT)
+                    } else {
+                        runtime::allocate_loopback_port()?
+                    };
+                    let spec = if cfg!(debug_assertions) {
+                        let start_dir = std::env::current_dir().unwrap_or_default();
+                        runtime::resolve_launch_spec(port, &start_dir)?
+                    } else {
+                        let resources = app
+                            .path()
+                            .resource_dir()
+                            .map_err(|error| format!("desktop resources unavailable: {error}"))?;
+                        runtime::resolve_bundled_launch_spec(port, &resources)?
+                    };
+                    let mut manager = runtime::RuntimeManager::new(port, spec);
+                    match manager.start(&env) {
+                        Ok(()) => return Ok((port, manager)),
+                        Err(error) => last_error = error,
+                    }
+                }
+                Err(last_error)
+            })();
+            let (port, manager) = match started {
+                Ok(started) => started,
                 Err(error) => {
                     eprintln!("dsh-desktop: {error}");
                     let window = WebviewWindowBuilder::new(
@@ -175,17 +200,13 @@ fn main() {
                     .title("DeepSeek Harness")
                     .inner_size(720.0, 480.0)
                     .build()?;
-                    std::mem::forget(manager); // no child was spawned
                     let _ = window;
                     return Ok(());
                 }
             };
-            if outcome == runtime::StartOutcome::Spawned {
-                // Keep the manager alive so the spawned child dies with the shell.
-                app.manage(manager);
-            } else {
-                std::mem::forget(manager); // a reused service must outlive the shell
-            }
+            // Keep the manager alive so the spawned child dies with the shell.
+            app.manage(manager);
+            app.manage(deeplink::WebPort(port));
 
             // The main window's URL always carries its label, so the web client
             // can report which session it shows back through the bridge.
@@ -203,7 +224,6 @@ fn main() {
                 .build()?;
             let _ = window;
 
-            app.manage(windows::WindowRegistry::new());
             if let Some(deeplink::DeepLinkTarget::Session(id)) = &boot_target {
                 app.state::<windows::WindowRegistry>()
                     .assign(windows::MAIN_LABEL, Some(id.clone()));
@@ -236,7 +256,9 @@ fn main() {
                 event: WindowEvent::Destroyed,
                 ..
             } => {
-                app.state::<windows::WindowRegistry>().unregister(&label);
+                if let Some(registry) = app.try_state::<windows::WindowRegistry>() {
+                    registry.unregister(&label);
+                }
             }
             RunEvent::WindowEvent {
                 label,
@@ -245,14 +267,14 @@ fn main() {
             } => {
                 if label == windows::MAIN_LABEL
                     && !app
-                        .state::<tray::QuitFlag>()
-                        .0
-                        .load(std::sync::atomic::Ordering::Relaxed)
+                        .try_state::<tray::QuitFlag>()
+                        .map(|flag| flag.0.load(std::sync::atomic::Ordering::Relaxed))
+                        .unwrap_or(true)
                 {
                     if app
-                        .state::<settings::SettingsState>()
-                        .snapshot()
-                        .close_to_tray
+                        .try_state::<settings::SettingsState>()
+                        .map(|settings| settings.snapshot().close_to_tray)
+                        .unwrap_or(false)
                     {
                         api.prevent_close();
                         if let Some(window) = app.get_webview_window(windows::MAIN_LABEL) {
@@ -260,9 +282,9 @@ fn main() {
                         }
                     } else {
                         // Closing the main window quits when close-to-tray is off.
-                        app.state::<tray::QuitFlag>()
-                            .0
-                            .store(true, std::sync::atomic::Ordering::Relaxed);
+                        if let Some(quit) = app.try_state::<tray::QuitFlag>() {
+                            quit.0.store(true, std::sync::atomic::Ordering::Relaxed);
+                        }
                         app.exit(0);
                     }
                 }

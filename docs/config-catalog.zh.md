@@ -3151,6 +3151,38 @@ export interface Config {
 
 来源：[`packages/workflow/workflow-worker-thread/src/index.ts:32`](../packages/workflow/workflow-worker-thread/src/index.ts)
 
+<a id="deepseek-aidsh-workspace-notes"></a>
+
+## `@deepseek-ai/dsh-workspace-notes`
+
+需要：`storageDomain` · `workspaceRegistry`
+
+```ts config-catalog
+/** Required deployment policy for workspace notes. */
+export interface Config {
+  /** Maximum UTF-8 byte length accepted for one note's content. */
+  readonly maxContentBytes: number
+}
+```
+
+来源：[`packages/workspace/workspace-notes/src/index.ts:47`](../packages/workspace/workspace-notes/src/index.ts)
+
+<a id="deepseek-aidsh-workspace-todos"></a>
+
+## `@deepseek-ai/dsh-workspace-todos`
+
+需要：`storageDomain` · `workspaceRegistry`
+
+```ts config-catalog
+/** Required deployment policy for shared todos. */
+export interface Config {
+  /** Maximum UTF-8 byte length accepted for one todo's single-line content. */
+  readonly maxContentBytes: number
+}
+```
+
+来源：[`packages/workspace/workspace-todos/src/index.ts:54`](../packages/workspace/workspace-todos/src/index.ts)
+
 ## 无配置的可加载插件
 
 这些插件通过 `cordis.yml` 中不含 `config:` 块的条目加载；它们未声明任何配置接口。
@@ -3191,6 +3223,8 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-user-questions`（[`packages/client/ui-user-questions/src/index.ts`](../packages/client/ui-user-questions/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-workflow-run`（[`packages/client/ui-workflow-run/src/index.ts`](../packages/client/ui-workflow-run/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-workspace`（[`packages/client/ui-workspace/src/index.ts`](../packages/client/ui-workspace/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-workspace-notes`（[`packages/client/ui-workspace-notes/src/index.ts`](../packages/client/ui-workspace-notes/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-workspace-todos`（[`packages/client/ui-workspace-todos/src/index.ts`](../packages/client/ui-workspace-todos/src/index.ts)）
 - `@deepseek-ai/dsh-command-compact` — 需要 `commands` · `compact`（[`packages/compaction/command-compact/src/index.ts`](../packages/compaction/command-compact/src/index.ts)）
 - `@deepseek-ai/dsh-command-feedback` — 需要 `commands`（[`packages/feedback/command-feedback/src/index.ts`](../packages/feedback/command-feedback/src/index.ts)）
 - `@deepseek-ai/dsh-command-goal` — 需要 `commands` · `goals`（[`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts)）

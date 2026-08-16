@@ -98,7 +98,7 @@ export class ApiProxyService extends Service implements ApiProxy {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'apiProxy')
-    const desktop = ctx.get('desktopHost') as Context['desktopHost'] | undefined
+    const desktop = ctx.get('desktopHost')
     const api = createApiProxy(ctx, {
       defaultModelSelection: () => ctx.agentDefaultModel.currentSelection(),
       saveDefaultModelSelection: selection => ctx.agentDefaultModel.saveSelection(selection),

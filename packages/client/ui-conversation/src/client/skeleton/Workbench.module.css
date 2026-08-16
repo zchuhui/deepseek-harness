@@ -1,0 +1,53 @@
+/* Workbench column wrapper: stacks the tab strip above the active pane.
+   Column chrome (border, background) stays with each pane; this only owns
+   the vertical stack. Tokens only — no literal colors (four themes). */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+}
+
+/* Same tab treatment as the session header's view ring (ConversationRoot),
+   compacted for the narrow details column. */
+.tabs {
+  display: flex;
+  gap: 20px;
+  padding: 10px 16px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.tab {
+  position: relative;
+  padding: 0 0 9px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.tab::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  left: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+}
+
+/* Selected tab rides the business blue (the brand-primary token resolves to
+   neutral ink in this token sheet) — the nearest semantic token that stays
+   blue in both themes. */
+.tabActive {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.tabActive::after {
+  background: var(--dsw-alias-state-business-primary);
+}

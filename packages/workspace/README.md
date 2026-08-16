@@ -7,6 +7,8 @@ This family owns persistent workspaces: user directories with titles and ordered
 | Package | Role | ctx key |
 |---|---|---|
 | [`workspace/`](workspace/README.md) | Registers workspaces and accounts for their sessions | `ctx.workspaceRegistry` |
+| [`workspace-notes/`](workspace-notes/README.md) | Durable workspace-scoped notes with revision compare-and-set | `ctx.workspaceNotes` |
+| [`workspace-todos/`](workspace-todos/README.md) | Workspace-scoped shared todos with validated status transitions and committed assignment | `ctx.workspaceTodos` |
 
 The [workspace package reference](workspace/README.md) owns lifecycle, persistence, and deletion semantics.
 

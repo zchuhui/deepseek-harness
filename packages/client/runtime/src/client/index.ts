@@ -166,6 +166,13 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'connection/reset'(): void
+    /**
+     * The connection generation died and backoff/retry began. Wire-derived
+     * read models mark their local state stale now and repull it on the next
+     * `connection/reset`.
+     * @mode emit
+     */
+    'connection/reconnecting'(): void
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry
@@ -269,6 +276,7 @@ export function apply(ctx: Context): void {
       // the only safe moment to drop generation-scoped interaction state.
       if (state === 'reconnecting') {
         sessions.handleDisconnected()
+        ctx.emit('connection/reconnecting')
       }
     },
   })

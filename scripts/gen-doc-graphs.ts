@@ -257,6 +257,22 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Owns WorkspaceId-branded records over the domain facility; stable sessionIds accounts drive Host RPC and GUI projections.',
   },
   {
+    key: 'workspaceNotes',
+    pkg: 'workspace-notes',
+    title: 'Workspace-scoped durable notes',
+    mode: 'core',
+    consumers: ['apiproxy'],
+    note: 'NoteId-keyed storage domain with revision compare-and-set; the forwarded workspace-notes/changed event drives browser refetch.',
+  },
+  {
+    key: 'workspaceTodos',
+    pkg: 'workspace-todos',
+    title: 'Workspace-scoped shared todos',
+    mode: 'core',
+    consumers: ['apiproxy'],
+    note: 'SharedTodoId-keyed storage domain with validated status transitions and committed assignment; the forwarded workspace-todos/changed event drives browser refetch.',
+  },
+  {
     key: 'sessionQuery',
     pkg: 'session-query',
     title: 'Session reads, traces, filters, and search',

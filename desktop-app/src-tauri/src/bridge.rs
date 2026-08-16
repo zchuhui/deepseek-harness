@@ -3,13 +3,11 @@
 //! activates the dsh protocol on Windows — directory picker, keychain,
 //! updater). Contract documented in README.md.
 
-use std::collections::hash_map::RandomState;
-use std::hash::{BuildHasher, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::DialogExt;
@@ -20,10 +18,6 @@ use tiny_http::{Header, Method, Response, Server, StatusCode};
 
 use crate::updater::{AvailableUpdate, CachedUpdate, UpdaterStateCache};
 
-/** Environment override for the bridge port; default 3901. */
-pub const ENV_BRIDGE_PORT: &str = "DSH_DESKTOP_BRIDGE_PORT";
-/** Default bridge port. */
-pub const DEFAULT_BRIDGE_PORT: u16 = 3901;
 /** Auth header every bridge request must carry. */
 pub const TOKEN_HEADER: &str = "x-dsh-bridge-token";
 /** Environment entry names handed to the spawned dsh child. */
@@ -31,19 +25,27 @@ pub const ENV_BRIDGE_URL: &str = "DSH_DESKTOP_BRIDGE_URL";
 pub const ENV_BRIDGE_TOKEN: &str = "DSH_DESKTOP_BRIDGE_TOKEN";
 
 /**
- * Generate one run-scoped bridge token: a hash of the boot time and process
- * id. Unpredictable enough to reject other local processes, not a security
- * boundary against the same OS user.
+ * Generate one 256-bit run-scoped bridge token from the operating system's
+ * cryptographic random source. It rejects accidental or unrelated local
+ * callers; it is not an authorization boundary against the same OS user.
  */
 pub fn generate_token() -> String {
-    let mut hasher = RandomState::new().build_hasher();
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    hasher.write_u128(nanos);
-    hasher.write_u32(std::process::id());
-    format!("{:032x}", hasher.finish() as u64)
+    let mut bytes = [0_u8; 32];
+    getrandom::fill(&mut bytes).expect("operating-system random source is available");
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+#[cfg(test)]
+mod token_tests {
+    use super::generate_token;
+
+    #[test]
+    fn token_is_a_256_bit_hex_value() {
+        let token = generate_token();
+        assert_eq!(64, token.len());
+        assert!(token.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        assert_ne!(token, generate_token());
+    }
 }
 
 /** The bridge loop handle: stops and joins on drop. */

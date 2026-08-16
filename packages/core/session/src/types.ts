@@ -389,6 +389,15 @@ export interface SurfaceIntent {
 }
 
 /**
+ * Envelope options for {@link Session.append} on log-only (non-surface)
+ * events. `ignorable: true` stamps {@link SessionEvent.ignorable} so readers
+ * that do not recognize the event type may skip it instead of refusing the log.
+ */
+export interface AppendEnvelopeOpts {
+  ignorable?: true
+}
+
+/**
  * One immutable entry in the session log.
  *
  * A proper discriminated union over `type` (not independent `type`/`data`

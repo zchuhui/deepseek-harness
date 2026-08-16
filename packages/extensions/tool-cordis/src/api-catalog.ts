@@ -2165,6 +2165,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'workspaceNotes',
+    summary: 'Workspace-scoped notes service.',
+    description: 'Workspace-scoped notes service. It owns the `workspace-notes` storage domain, serializes each workspace\'s mutations, queues record cleanup when a workspace registration is deleted, and recovers interrupted cleanups on open. Disabling the plugin closes the domain without deleting it; reopening restores every still-registered workspace\'s notes.',
+    methods: [
+      {
+        signature: '@Remote(\'list\') list(request: WorkspaceNotesListRequest): Promise<WorkspaceNotesListResult>',
+        description: 'Read the ordered note view of one registered workspace.',
+        parameters: [{ name: 'request', description: 'Workspace whose notes should be read.' }],
+        returns: 'the ordered immutable view or `unknown-workspace`.',
+      },
+      {
+        signature: '@Remote(\'create\') create(request: WorkspaceNotesCreateRequest): Promise<WorkspaceNotesCreateResult>',
+        description: 'Create one note in a registered workspace at revision 1.',
+        parameters: [{ name: 'request', description: 'owning workspace, validated content, visibility, and immutable provenance.' }],
+        returns: 'the committed note or an explicit business failure.',
+      },
+      {
+        signature: '@Remote(\'update\') update(request: WorkspaceNotesUpdateRequest): Promise<WorkspaceNotesUpdateResult>',
+        description: 'Edit one note\'s content and/or Agent visibility against an observed revision. A matching no-op returns the stored note without changing its revision.',
+        parameters: [{ name: 'request', description: 'target, observed revision, and desired fields.' }],
+        returns: 'the committed note or an explicit business failure.',
+      },
+      {
+        signature: '@Remote(\'delete\') delete(request: WorkspaceNotesDeleteRequest): Promise<WorkspaceNotesDeleteResult>',
+        description: 'Delete one note against an observed revision. Absence is successful regardless of the supplied revision.',
+        parameters: [{ name: 'request', description: 'target note and observed revision.' }],
+        returns: 'the stable absent postcondition, or an explicit failure.',
+      },
+    ],
+  },
+  {
     key: 'workspaceRegistry',
     summary: 'Durable workspace registry.',
     description: 'Durable workspace registry. Startup waits for `sessionPersistence`, builds one canonical-cwd header index, and completes the one-time history bootstrap before the service becomes active. The persistence dependency is mandatory so an unavailable peer can never be mistaken for an empty history and commit the initialized marker.',
@@ -2210,6 +2241,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Resolve by canonical directory path without creating or mutating a workspace. A missing path rejects during `realpath`; an existing unowned directory returns `undefined`.',
         parameters: [{ name: 'path', description: 'Existing directory path in any spelling.' }],
         returns: 'the workspace owning the canonical path, when one exists.',
+      },
+    ],
+  },
+  {
+    key: 'workspaceTodos',
+    summary: 'Workspace-scoped shared todos service.',
+    description: 'Workspace-scoped shared todos service. It owns the `workspace-todos` storage domain, serializes each workspace\'s mutations, validates the documented status transitions, commits assignments atomically, queues record cleanup when a workspace registration is deleted, and recovers interrupted cleanups on open. Disabling the plugin closes the domain without deleting it; reopening restores every still-registered workspace\'s todos.',
+    methods: [
+      {
+        signature: '@Remote(\'list\') list(request: SharedTodosListRequest): Promise<SharedTodosListResult>',
+        description: 'Read the ordered todo view of one registered workspace.',
+        parameters: [{ name: 'request', description: 'Workspace whose todos should be read.' }],
+        returns: 'the ordered immutable view or `unknown-workspace`.',
+      },
+      {
+        signature: '@Remote(\'create\') create(request: SharedTodosCreateRequest): Promise<SharedTodosCreateResult>',
+        description: 'Create one shared todo in a registered workspace at revision 1 in status `pending`.',
+        parameters: [{ name: 'request', description: 'owning workspace, validated content, and immutable provenance.' }],
+        returns: 'the committed todo or an explicit business failure.',
+      },
+      {
+        signature: '@Remote(\'updateContent\') updateContent(request: SharedTodosUpdateContentRequest): Promise<SharedTodosUpdateContentResult>',
+        description: 'Edit one shared todo\'s content against an observed revision. A matching no-op returns the stored todo without changing its revision.',
+        parameters: [{ name: 'request', description: 'target, observed revision, and replacement content.' }],
+        returns: 'the committed todo or an explicit business failure.',
+      },
+      {
+        signature: '@Remote(\'setStatus\') setStatus(request: SharedTodosSetStatusRequest): Promise<SharedTodosSetStatusResult>',
+        description: 'Move one shared todo to a requested status against an observed revision. The transition must be one of the documented allowed transitions; a request for the current status is a matching no-op.',
+        parameters: [{ name: 'request', description: 'target, observed revision, and requested status.' }],
+        returns: 'the committed todo or an explicit business failure.',
+      },
+      {
+        signature: '@Remote(\'assign\') assign(request: SharedTodosAssignRequest): Promise<SharedTodosAssignResult>',
+        description: 'Commit one assignment: `pending → in_progress` plus `assignedSessionId` in one atomic compare-and-set. Reassignment of a `pending` todo that carries an earlier assignment (for example after `completed → pending`) replaces that session id.',
+        parameters: [{ name: 'request', description: 'target, observed revision, and addressed session.' }],
+        returns: 'the committed todo or an explicit business failure.',
+      },
+      {
+        signature: '@Remote(\'delete\') delete(request: SharedTodosDeleteRequest): Promise<SharedTodosDeleteResult>',
+        description: 'Delete one shared todo against an observed revision. Absence is successful regardless of the supplied revision.',
+        parameters: [{ name: 'request', description: 'target todo and observed revision.' }],
+        returns: 'the stable absent postcondition, or an explicit failure.',
       },
     ],
   },
@@ -2664,6 +2738,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A workflow run started — the script\'s meta block validated, the body about to execute.',
     description: 'A workflow run started — the script\'s meta block validated, the body about to execute. Paired with Events[\'workflow/end\'].',
     parameters: [{ name: 'info', description: 'the run\'s identity snapshot (id + meta).' }],
+  },
+  {
+    name: 'workspace-notes/changed',
+    mode: 'emit',
+    signature: '\'workspace-notes/changed\'(change: WorkspaceNotesChanged): void',
+    summary: 'A workspace\'s notes view changed after a committed create, update, delete, or completed cleanup recovery.',
+    description: 'A workspace\'s notes view changed after a committed create, update, delete, or completed cleanup recovery. Emitted after the storage domain acknowledges durability and the per-workspace artifact-family revision advances; forwarded to consumers as the push invalidation signal.',
+    parameters: [{ name: 'change', description: 'owning workspace and its new notes-family revision.' }],
+  },
+  {
+    name: 'workspace-todos/changed',
+    mode: 'emit',
+    signature: '\'workspace-todos/changed\'(change: SharedTodosChanged): void',
+    summary: 'A workspace\'s todos view changed after a committed create, content edit, status change, assignment, delete, or completed cleanup recovery.',
+    description: 'A workspace\'s todos view changed after a committed create, content edit, status change, assignment, delete, or completed cleanup recovery. Emitted after the storage domain acknowledges durability and the per-workspace artifact-family revision advances; forwarded to consumers as the push invalidation signal.',
+    parameters: [{ name: 'change', description: 'owning workspace and its new todos-family revision.' }],
   },
 ]
 
@@ -3530,6 +3620,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ModelModalityMap {\n    text: \'text\';\n    image: \'image\';\n}',
   },
   {
+    name: 'NoteId',
+    declaration: 'export type NoteId = Branded<\'NoteId\'>;',
+  },
+  {
     name: 'Notification',
     declaration: 'export interface Notification {\n    kind: NotificationKind;\n    title: string;\n    body: string;\n    sessionId?: SessionId;\n}',
   },
@@ -4056,6 +4150,130 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SettingsUpdateSource',
     declaration: 'export type SettingsUpdateSource = \'update\' | \'provider\';',
+  },
+  {
+    name: 'SharedTodo',
+    declaration: 'export interface SharedTodo {\n    readonly todoId: SharedTodoId;\n    readonly workspaceId: WorkspaceId;\n    readonly revision: number;\n    readonly content: string;\n    readonly status: SharedTodoStatus;\n    readonly createdBy: SharedTodoCreatedBy;\n    readonly assignedSessionId: SessionId | null;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n    readonly completedAt: string | null;\n}',
+  },
+  {
+    name: 'SharedTodoCreatedBy',
+    declaration: 'export type SharedTodoCreatedBy = SharedTodoCreatedByUser | SharedTodoCreatedByAgent;',
+  },
+  {
+    name: 'SharedTodoCreatedByAgent',
+    declaration: 'export interface SharedTodoCreatedByAgent {\n    readonly kind: \'agent\';\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SharedTodoCreatedByUser',
+    declaration: 'export interface SharedTodoCreatedByUser {\n    readonly kind: \'user\';\n}',
+  },
+  {
+    name: 'SharedTodoId',
+    declaration: 'export type SharedTodoId = Branded<\'SharedTodoId\'>;',
+  },
+  {
+    name: 'SharedTodosAssignRequest',
+    declaration: 'export interface SharedTodosAssignRequest {\n    readonly todoId: SharedTodoId;\n    readonly expectedRevision: number;\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SharedTodosAssignResult',
+    declaration: 'export type SharedTodosAssignResult = SharedTodosSuccess<SharedTodo> | SharedTodosRejected<SharedTodosUnknownWorkspace | SharedTodosUnknownTodo | SharedTodosRevisionConflict | SharedTodosInvalidTransition>;',
+  },
+  {
+    name: 'SharedTodosChanged',
+    declaration: 'export interface SharedTodosChanged {\n    readonly workspaceId: WorkspaceId;\n    readonly revision: number;\n}',
+  },
+  {
+    name: 'SharedTodosContentBlank',
+    declaration: 'export interface SharedTodosContentBlank {\n    readonly code: \'content-blank\';\n}',
+  },
+  {
+    name: 'SharedTodosContentNotSingleLine',
+    declaration: 'export interface SharedTodosContentNotSingleLine {\n    readonly code: \'content-not-single-line\';\n}',
+  },
+  {
+    name: 'SharedTodosContentTooLarge',
+    declaration: 'export interface SharedTodosContentTooLarge {\n    readonly code: \'content-too-large\';\n    readonly maxBytes: number;\n    readonly actualBytes: number;\n}',
+  },
+  {
+    name: 'SharedTodosCreateRequest',
+    declaration: 'export interface SharedTodosCreateRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly content: string;\n    readonly createdBy: SharedTodoCreatedBy;\n}',
+  },
+  {
+    name: 'SharedTodosCreateResult',
+    declaration: 'export type SharedTodosCreateResult = SharedTodosSuccess<SharedTodo> | SharedTodosRejected<SharedTodosUnknownWorkspace | SharedTodosContentBlank | SharedTodosContentNotSingleLine | SharedTodosContentTooLarge>;',
+  },
+  {
+    name: 'SharedTodosDeleteRequest',
+    declaration: 'export interface SharedTodosDeleteRequest {\n    readonly todoId: SharedTodoId;\n    readonly expectedRevision: number;\n}',
+  },
+  {
+    name: 'SharedTodosDeleteResult',
+    declaration: 'export type SharedTodosDeleteResult = SharedTodosSuccess<SharedTodosDeleteValue> | SharedTodosRejected<SharedTodosUnknownWorkspace | SharedTodosRevisionConflict>;',
+  },
+  {
+    name: 'SharedTodosDeleteValue',
+    declaration: 'export interface SharedTodosDeleteValue {\n    readonly absent: true;\n}',
+  },
+  {
+    name: 'SharedTodosFailure',
+    declaration: 'export type SharedTodosFailure = SharedTodosUnknownWorkspace | SharedTodosUnknownTodo | SharedTodosRevisionConflict | SharedTodosInvalidTransition | SharedTodosContentBlank | SharedTodosContentNotSingleLine | SharedTodosContentTooLarge;',
+  },
+  {
+    name: 'SharedTodosInvalidTransition',
+    declaration: 'export interface SharedTodosInvalidTransition {\n    readonly code: \'invalid-transition\';\n    readonly current: SharedTodoStatus;\n    readonly requested: SharedTodoStatus;\n}',
+  },
+  {
+    name: 'SharedTodosListRequest',
+    declaration: 'export interface SharedTodosListRequest {\n    readonly workspaceId: WorkspaceId;\n}',
+  },
+  {
+    name: 'SharedTodosListResult',
+    declaration: 'export type SharedTodosListResult = SharedTodosSuccess<SharedTodosListValue> | SharedTodosRejected<SharedTodosUnknownWorkspace>;',
+  },
+  {
+    name: 'SharedTodosListValue',
+    declaration: 'export interface SharedTodosListValue {\n    readonly todos: readonly SharedTodo[];\n}',
+  },
+  {
+    name: 'SharedTodosRejected',
+    declaration: 'export interface SharedTodosRejected<E extends SharedTodosFailure> {\n    readonly ok: false;\n    readonly error: E;\n}',
+  },
+  {
+    name: 'SharedTodosRevisionConflict',
+    declaration: 'export interface SharedTodosRevisionConflict {\n    readonly code: \'revision-conflict\';\n    readonly current: SharedTodo | null;\n}',
+  },
+  {
+    name: 'SharedTodosSetStatusRequest',
+    declaration: 'export interface SharedTodosSetStatusRequest {\n    readonly todoId: SharedTodoId;\n    readonly expectedRevision: number;\n    readonly status: SharedTodoStatus;\n}',
+  },
+  {
+    name: 'SharedTodosSetStatusResult',
+    declaration: 'export type SharedTodosSetStatusResult = SharedTodosSuccess<SharedTodo> | SharedTodosRejected<SharedTodosUnknownWorkspace | SharedTodosUnknownTodo | SharedTodosRevisionConflict | SharedTodosInvalidTransition>;',
+  },
+  {
+    name: 'SharedTodosSuccess',
+    declaration: 'export interface SharedTodosSuccess<T> {\n    readonly ok: true;\n    readonly value: T;\n}',
+  },
+  {
+    name: 'SharedTodoStatus',
+    declaration: 'export type SharedTodoStatus = \'pending\' | \'in_progress\' | \'completed\' | \'cancelled\';',
+  },
+  {
+    name: 'SharedTodosUnknownTodo',
+    declaration: 'export interface SharedTodosUnknownTodo {\n    readonly code: \'unknown-todo\';\n    readonly todoId: SharedTodoId;\n}',
+  },
+  {
+    name: 'SharedTodosUnknownWorkspace',
+    declaration: 'export interface SharedTodosUnknownWorkspace {\n    readonly code: \'unknown-workspace\';\n    readonly workspaceId: WorkspaceId;\n}',
+  },
+  {
+    name: 'SharedTodosUpdateContentRequest',
+    declaration: 'export interface SharedTodosUpdateContentRequest {\n    readonly todoId: SharedTodoId;\n    readonly expectedRevision: number;\n    readonly content: string;\n}',
+  },
+  {
+    name: 'SharedTodosUpdateContentResult',
+    declaration: 'export type SharedTodosUpdateContentResult = SharedTodosSuccess<SharedTodo> | SharedTodosRejected<SharedTodosUnknownWorkspace | SharedTodosUnknownTodo | SharedTodosRevisionConflict | SharedTodosContentBlank | SharedTodosContentNotSingleLine | SharedTodosContentTooLarge>;',
   },
   {
     name: 'ShellExecRequest',
@@ -4728,6 +4946,102 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkflowStopReason',
     declaration: 'export type WorkflowStopReason = \'completed\' | \'cancelled\' | \'error\';',
+  },
+  {
+    name: 'WorkspaceNote',
+    declaration: 'export interface WorkspaceNote {\n    readonly noteId: NoteId;\n    readonly workspaceId: WorkspaceId;\n    readonly revision: number;\n    readonly content: string;\n    readonly agentVisible: boolean;\n    readonly source: WorkspaceNoteSource;\n    readonly createdAt: string;\n    readonly updatedAt: string;\n}',
+  },
+  {
+    name: 'WorkspaceNotesChanged',
+    declaration: 'export interface WorkspaceNotesChanged {\n    readonly workspaceId: WorkspaceId;\n    readonly revision: number;\n}',
+  },
+  {
+    name: 'WorkspaceNotesContentBlank',
+    declaration: 'export interface WorkspaceNotesContentBlank {\n    readonly code: \'content-blank\';\n}',
+  },
+  {
+    name: 'WorkspaceNotesContentTooLarge',
+    declaration: 'export interface WorkspaceNotesContentTooLarge {\n    readonly code: \'content-too-large\';\n    readonly maxBytes: number;\n    readonly actualBytes: number;\n}',
+  },
+  {
+    name: 'WorkspaceNotesCreateRequest',
+    declaration: 'export interface WorkspaceNotesCreateRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly content: string;\n    readonly agentVisible: boolean;\n    readonly source: WorkspaceNoteSource;\n}',
+  },
+  {
+    name: 'WorkspaceNotesCreateResult',
+    declaration: 'export type WorkspaceNotesCreateResult = WorkspaceNotesSuccess<WorkspaceNote> | WorkspaceNotesRejected<WorkspaceNotesUnknownWorkspace | WorkspaceNotesContentBlank | WorkspaceNotesContentTooLarge>;',
+  },
+  {
+    name: 'WorkspaceNotesDeleteRequest',
+    declaration: 'export interface WorkspaceNotesDeleteRequest {\n    readonly noteId: NoteId;\n    readonly expectedRevision: number;\n}',
+  },
+  {
+    name: 'WorkspaceNotesDeleteResult',
+    declaration: 'export type WorkspaceNotesDeleteResult = WorkspaceNotesSuccess<WorkspaceNotesDeleteValue> | WorkspaceNotesRejected<WorkspaceNotesUnknownWorkspace | WorkspaceNotesRevisionConflict>;',
+  },
+  {
+    name: 'WorkspaceNotesDeleteValue',
+    declaration: 'export interface WorkspaceNotesDeleteValue {\n    readonly absent: true;\n}',
+  },
+  {
+    name: 'WorkspaceNotesFailure',
+    declaration: 'export type WorkspaceNotesFailure = WorkspaceNotesUnknownWorkspace | WorkspaceNotesUnknownNote | WorkspaceNotesRevisionConflict | WorkspaceNotesContentBlank | WorkspaceNotesContentTooLarge;',
+  },
+  {
+    name: 'WorkspaceNotesListRequest',
+    declaration: 'export interface WorkspaceNotesListRequest {\n    readonly workspaceId: WorkspaceId;\n}',
+  },
+  {
+    name: 'WorkspaceNotesListResult',
+    declaration: 'export type WorkspaceNotesListResult = WorkspaceNotesSuccess<WorkspaceNotesListValue> | WorkspaceNotesRejected<WorkspaceNotesUnknownWorkspace>;',
+  },
+  {
+    name: 'WorkspaceNotesListValue',
+    declaration: 'export interface WorkspaceNotesListValue {\n    readonly notes: readonly WorkspaceNote[];\n}',
+  },
+  {
+    name: 'WorkspaceNoteSource',
+    declaration: 'export type WorkspaceNoteSource = WorkspaceNoteSourceManual | WorkspaceNoteSourceMessage | WorkspaceNoteSourceAgent;',
+  },
+  {
+    name: 'WorkspaceNoteSourceAgent',
+    declaration: 'export interface WorkspaceNoteSourceAgent {\n    readonly kind: \'agent\';\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'WorkspaceNoteSourceManual',
+    declaration: 'export interface WorkspaceNoteSourceManual {\n    readonly kind: \'manual\';\n}',
+  },
+  {
+    name: 'WorkspaceNoteSourceMessage',
+    declaration: 'export interface WorkspaceNoteSourceMessage {\n    readonly kind: \'message\';\n    readonly sessionId: SessionId;\n    readonly sourceEventSeq: number;\n}',
+  },
+  {
+    name: 'WorkspaceNotesRejected',
+    declaration: 'export interface WorkspaceNotesRejected<E extends WorkspaceNotesFailure> {\n    readonly ok: false;\n    readonly error: E;\n}',
+  },
+  {
+    name: 'WorkspaceNotesRevisionConflict',
+    declaration: 'export interface WorkspaceNotesRevisionConflict {\n    readonly code: \'revision-conflict\';\n    readonly current: WorkspaceNote | null;\n}',
+  },
+  {
+    name: 'WorkspaceNotesSuccess',
+    declaration: 'export interface WorkspaceNotesSuccess<T> {\n    readonly ok: true;\n    readonly value: T;\n}',
+  },
+  {
+    name: 'WorkspaceNotesUnknownNote',
+    declaration: 'export interface WorkspaceNotesUnknownNote {\n    readonly code: \'unknown-note\';\n    readonly noteId: NoteId;\n}',
+  },
+  {
+    name: 'WorkspaceNotesUnknownWorkspace',
+    declaration: 'export interface WorkspaceNotesUnknownWorkspace {\n    readonly code: \'unknown-workspace\';\n    readonly workspaceId: WorkspaceId;\n}',
+  },
+  {
+    name: 'WorkspaceNotesUpdateRequest',
+    declaration: 'export interface WorkspaceNotesUpdateRequest {\n    readonly noteId: NoteId;\n    readonly expectedRevision: number;\n    readonly content?: string;\n    readonly agentVisible?: boolean;\n}',
+  },
+  {
+    name: 'WorkspaceNotesUpdateResult',
+    declaration: 'export type WorkspaceNotesUpdateResult = WorkspaceNotesSuccess<WorkspaceNote> | WorkspaceNotesRejected<WorkspaceNotesUnknownWorkspace | WorkspaceNotesUnknownNote | WorkspaceNotesRevisionConflict | WorkspaceNotesContentBlank | WorkspaceNotesContentTooLarge>;',
   },
 ]
 

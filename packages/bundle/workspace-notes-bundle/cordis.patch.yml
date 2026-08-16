@@ -1,0 +1,18 @@
+# Optional workspace-notes layer for the Web profile. It deliberately inserts
+# nothing into dsh-base or dsh-web-app: install this bundle only when a profile
+# should expose workspace notes.
+
+- insert:
+    - id: workspace-notes
+      name: '@deepseek-ai/dsh-workspace-notes'
+      config:
+        maxContentBytes: 65536
+
+    - id: workspace-notes-agent
+      name: '@deepseek-ai/dsh-workspace-notes-agent'
+      config:
+        maxRenderBytes: 8192
+        maxNotes: 10
+
+    - id: ui-workspace-notes
+      name: '@deepseek-ai/dsh-client-ui-workspace-notes'

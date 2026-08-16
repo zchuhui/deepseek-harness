@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import type { WebServer } from '@deepseek-ai/dsh-host-webserver'
-import { apply, Config, internals } from '../src/index.ts'
+import { addDesktopCsp, apply, Config, internals } from '../src/index.ts'
 
 vi.mock('node:os', async importOriginal => ({
   ...await importOriginal<typeof import('node:os')>(),
@@ -70,6 +70,11 @@ interface BashContribution {
 }
 
 describe('web-app runtime glue', () => {
+  it('injects the desktop CSP into the served document head', () => {
+    expect(addDesktopCsp('<head></head><body>shell</body>')).toContain('Content-Security-Policy')
+    expect(addDesktopCsp('<body>shell</body>')).toMatch(/^<meta/)
+  })
+
   it('mounts dist serving, prompt section, bash variables, and prints the URL with the LAN snapshot', async () => {
     stageDist()
     const ctx = new Context()

@@ -282,6 +282,22 @@ export class WorkspaceRegistry extends Service {
     return undefined
   }
 
+  /**
+   * Resolve the workspace owning a session by header-validated membership —
+   * the same filtered `sessionIds` projection every grouping surface uses.
+   * A session accounted by no workspace resolves to `undefined`; callers
+   * offering workspace-scoped tooling hide it for such sessions rather than
+   * guessing a workspace by path.
+   * @param sessionId - The session whose owning workspace is requested.
+   * @returns the owning workspace, or `undefined` when none accounts it.
+   */
+  resolveBySession(sessionId: SessionId): Workspace | undefined {
+    for (const entity of this.entities.values()) {
+      if (entity.sessionIds.includes(sessionId)) return entity
+    }
+    return undefined
+  }
+
   private async createCanonical(canonical: string, title?: string): Promise<WorkspaceEntity> {
     for (const entity of this.entities.values()) {
       if (entity.path === canonical) return entity

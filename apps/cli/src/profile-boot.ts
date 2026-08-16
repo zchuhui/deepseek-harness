@@ -96,8 +96,12 @@ export function resolveTelemetryPatch(disabledEnv: string | undefined, hasRow: b
  * @returns the loaded profile.
  */
 export function prepareProfile(name: string, userLayer = true): Profile {
-  healProfilesModuleFallback(INSTALL_ANCHOR)
   const profile = loadProfile(NAME, name, INSTALL_ANCHOR, undefined, { userLayer })
+  healProfilesModuleFallback(
+    INSTALL_ANCHOR,
+    undefined,
+    profile.layers.map(layer => join(layer.packageDir, 'package.json')),
+  )
   writeFileSync(join(profile.dir, PROFILE_ROOT_FILENAME), PROFILE_ROOT_CONFIG)
   return profile
 }

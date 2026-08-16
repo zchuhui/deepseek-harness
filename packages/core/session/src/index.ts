@@ -14,7 +14,7 @@ import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Message } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, SessionId } from './types.ts'
 import type { TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
-import type { CreateSessionOptions, EpochHeader, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
+import type { AppendEnvelopeOpts, CreateSessionOptions, EpochHeader, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
 import { snapshotJsonValue } from './json.ts'
 import { deriveEventMessage, SurfaceManager } from './surface.ts'
 import type { SessionSurface } from './surface.ts'
@@ -581,9 +581,10 @@ export class Session {
    *   events this one derives from. REQUIRED for
    *   {@link SurfaceEventType} events (every message-producing event must
    *   declare how it joins the surface, the sole source of derived model
-   *   history) and
-   *   rejected by the compiler for non-surface types like `turn/start` or
-   *   `assistant/chunk`.
+   *   history) and rejected by the compiler for non-surface types like
+   *   `turn/start` or `assistant/chunk`, which instead take
+   *   {@link AppendEnvelopeOpts} (`ignorable: true` marks an event readers
+   *   may skip when they do not recognize its type).
    * @returns the logged event — its assigned `seq`/`time` plus the SNAPSHOT of
    *   `data` that entered the log, so reading `event.data` back sees the logged
    *   value, never the caller's still-mutable input.
@@ -604,9 +605,10 @@ export class Session {
   append<T extends SessionEventType>(
     type: T,
     data: SessionEventMap[T],
-    ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent] : []
+    ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent] : [opts?: AppendEnvelopeOpts]
   ): SessionEvent<T> {
-    const surfaceOpts: SurfaceIntent | undefined = opts[0]
+    const surfaceOpts: SurfaceIntent | undefined = opts[0] as SurfaceIntent | undefined
+    const envelopeOpts: AppendEnvelopeOpts | undefined = opts[0] as AppendEnvelopeOpts | undefined
     const surfaceMetadata = {
       ...surfaceOpts?.sourceEventSeqs === undefined ? {} : { sourceEventSeqs: surfaceOpts.sourceEventSeqs },
       ...surfaceOpts?.surfaceOp === undefined ? {} : { surfaceOp: surfaceOpts.surfaceOp },
@@ -630,6 +632,7 @@ export class Session {
       time: Date.now(),
       data: dataSnapshot,
       ...(surfaceMetadataSnapshot as { surfaceOp?: unknown; sourceEventSeqs?: unknown }),
+      ...envelopeOpts?.ignorable === true ? { ignorable: true as const } : {},
     } as unknown as SessionEvent<T>)
     this.surfaceManager.validateNext(event as SessionEvent)
 
@@ -1029,7 +1032,6 @@ export class SessionStore extends Service {
       } catch (error: unknown) {
         // Preserve the listener's exact rejection value; flush is a caller-owned
         // failure boundary, and Cordis listeners may throw arbitrary values.
-        // oxlint-disable-next-line typescript/prefer-promise-reject-errors
         return Promise.reject(error)
       }
     }))

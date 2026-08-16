@@ -109,6 +109,8 @@ export const SERVICE_PAGE: Record<string, string> = {
   web: 'web.md',
   workflowEngine: 'workflow.md',
   workspaceRegistry: 'workspace.md',
+  workspaceNotes: 'workspace.md',
+  workspaceTodos: 'workspace.md',
 }
 
 /**
@@ -185,6 +187,8 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'session-telemetry': 'session-telemetry.md',
   'tools': 'tools.md',
   'workflow': 'workflow.md',
+  'workspace-notes': 'workspace.md',
+  'workspace-todos': 'workspace.md',
 }
 
 /**
@@ -199,6 +203,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
  */
 export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
   'command/executed': 'client-face local command acknowledgment — packages/client/ui-commands/README.md owns the API',
+  'connection/reconnecting': 'client-face transport signal — packages/client/runtime/README.md owns the API',
   'connection/reset': 'client-face transport signal — packages/client/runtime/README.md owns the API',
   'locale/change': 'client-face locale switch signal — packages/client/locale/README.md owns the API',
   'slash/input-begin-command': 'client-face slash-input protocol — packages/client/ui-input-trigger/README.md owns the API',
@@ -474,6 +479,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   DomainFacility: 'storage.md',
   Workspace: 'workspace.md',
   WorkspaceId: 'workspace.md',
+  WorkspaceNotesChanged: 'workspace.md',
+  SharedTodosChanged: 'workspace.md',
   WebBootGraph: 'client-modules.md',
   SessionTelemetryRecord: 'session-telemetry.md',
   WorkflowRunInfo: 'workflow.md',
@@ -510,6 +517,26 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
 /** Project types deliberately documented outside the subsystems catalog. */
 export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   z: 'schemastery schema constructor is owned by vendor/schemastery (vendored upstream)',
+  WorkspaceNotesListRequest: 'remote request contract is owned by packages/workspace/workspace-notes/README.md',
+  WorkspaceNotesListResult: 'remote result contract is owned by packages/workspace/workspace-notes/README.md',
+  WorkspaceNotesCreateRequest: 'remote request contract is owned by packages/workspace/workspace-notes/README.md',
+  WorkspaceNotesCreateResult: 'remote result contract is owned by packages/workspace/workspace-notes/README.md',
+  WorkspaceNotesUpdateRequest: 'remote request contract is owned by packages/workspace/workspace-notes/README.md',
+  WorkspaceNotesUpdateResult: 'remote result contract is owned by packages/workspace/workspace-notes/README.md',
+  WorkspaceNotesDeleteRequest: 'remote request contract is owned by packages/workspace/workspace-notes/README.md',
+  WorkspaceNotesDeleteResult: 'remote result contract is owned by packages/workspace/workspace-notes/README.md',
+  SharedTodosListRequest: 'remote request contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosListResult: 'remote result contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosCreateRequest: 'remote request contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosCreateResult: 'remote result contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosUpdateContentRequest: 'remote request contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosUpdateContentResult: 'remote result contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosSetStatusRequest: 'remote request contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosSetStatusResult: 'remote result contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosAssignRequest: 'remote request contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosAssignResult: 'remote result contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosDeleteRequest: 'remote request contract is owned by packages/workspace/workspace-todos/README.md',
+  SharedTodosDeleteResult: 'remote result contract is owned by packages/workspace/workspace-todos/README.md',
   BeginCommandRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   InsertReferenceRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',
   ConsumeTokenRequest: 'event-local request contract is owned by packages/client/ui-input-trigger/src/types.ts',

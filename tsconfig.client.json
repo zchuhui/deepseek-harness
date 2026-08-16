@@ -85,6 +85,8 @@
     { "path": "./packages/client/ui-settings-plugins" },
     { "path": "./packages/client/ui-user-questions" },
     { "path": "./packages/client/ui-trajectory" },
+    { "path": "./packages/client/ui-workspace-notes" },
+    { "path": "./packages/client/ui-workspace-todos" },
     { "path": "./packages/session-query/session-log-export" },
     { "path": "./packages/client/ui-theme" },
     { "path": "./packages/client/ui-settings" },

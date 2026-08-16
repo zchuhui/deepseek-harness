@@ -1,4 +1,4 @@
-﻿// Signs one Windows binary with Authenticode. Invoked by tauri build through
+﻿﻿// Signs one Windows binary with Authenticode. Invoked by tauri build through
 // `bundle.windows.signCommand` ("%1" = the file to sign), so the minisign
 // updater signature covers the Authenticode-signed installer. Without
 // AUTHENTICODE_CERT the helper succeeds without signing: dev builds keep

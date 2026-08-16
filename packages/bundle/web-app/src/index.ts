@@ -66,6 +66,22 @@ export interface WebRuntimeValues {
 /** Environment variable naming the canonical local URL of this Web GUI. */
 const DSH_WEB_URL = 'DSH_WEB_URL' as const
 
+/** Per-shell nonce that authorizes the native shell's loopback readiness probe. */
+export const DSH_DESKTOP_WEB_TOKEN = 'DSH_DESKTOP_WEB_TOKEN' as const
+
+/** CSP injected into the desktop-served index; native IPC stays unavailable to this page. */
+const DESKTOP_CSP = "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:"
+
+/**
+ * Add the desktop CSP before the document's closing head tag.
+ * @param html - Served index document, with or without a closing head tag.
+ * @returns the document with the desktop CSP meta tag injected.
+ */
+export function addDesktopCsp(html: string): string {
+  const tag = `<meta http-equiv="Content-Security-Policy" content="${DESKTOP_CSP}">`
+  return html.includes('</head>') ? html.replace('</head>', `${tag}</head>`) : `${tag}${html}`
+}
+
 // Display-only mirror of the webserver schema's loopback host: the address the
 // local URL always prints. Not a source of truth — the schema is.
 const LOOPBACK_HOST = '127.0.0.1'
@@ -137,6 +153,26 @@ export function apply(ctx: Context, config: Config): void {
   // Release dependent rows only after bind-dependent trust has been sampled once.
   ctx.provide(WEB_RUNTIME_SERVICE, runtime)
   ctx.plugin(FrontendStatic, { distIndex: internals.resolveDistIndex() })
+  const desktopToken = process.env[DSH_DESKTOP_WEB_TOKEN]
+  if (desktopToken !== undefined && desktopToken !== '') {
+    ctx.effect(() => ctx.webServer.tapIndex(addDesktopCsp), 'web-app.desktop-csp')
+    ctx.effect(() => ctx.webServer.register({
+      kind: 'exact',
+      path: '/internal/desktop/ready',
+      handler: (request, response) => {
+        if (request.headers['x-dsh-desktop-token'] !== desktopToken) {
+          response.writeHead(401)
+          response.end()
+          return
+        }
+        response.writeHead(204, {
+          'Cache-Control': 'no-store',
+          'Content-Security-Policy': "default-src 'none'",
+        })
+        response.end()
+      },
+    }), 'web-app.desktop-ready')
+  }
   if (config.surfaceContext) {
     ctx.inject(['systemPrompt'], (promptCtx) => {
       addHarnessSourceSection(promptCtx, SOURCE_ROOT)

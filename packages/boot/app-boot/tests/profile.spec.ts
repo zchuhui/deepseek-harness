@@ -239,6 +239,32 @@ describe('healProfilesModuleFallback', () => {
     expect(before).toContain('dep-of-a')
   })
 
+  it('links the closure of a source-linked profile bundle', () => {
+    const anchor = stageInstallation({})
+    const home = tmp()
+    const source = tmp()
+    const bundle = join(source, 'bundle')
+    const leaf = join(source, 'node_modules', 'source-leaf')
+    mkdirSync(bundle, { recursive: true })
+    mkdirSync(leaf, { recursive: true })
+    writeFileSync(join(bundle, 'package.json'), JSON.stringify({
+      name: 'source-bundle',
+      version: '0.0.0',
+      dependencies: { 'source-leaf': '0.0.0' },
+    }))
+    writeFileSync(join(leaf, 'package.json'), JSON.stringify({ name: 'source-leaf', version: '0.0.0' }))
+    const linkedBundle = join(home, 'profiles', 'web', 'node_modules', 'source-bundle')
+    mkdirSync(join(linkedBundle, '..'), { recursive: true })
+    symlinkSync(bundle, linkedBundle, 'junction')
+
+    healProfilesModuleFallback(anchor, home, [join(linkedBundle, 'package.json')])
+
+    const fallback = join(home, 'profiles', 'node_modules')
+    for (const name of ['source-bundle', 'source-leaf']) {
+      expect(lstatSync(join(fallback, name)).isSymbolicLink(), name).toBe(true)
+    }
+  })
+
   it('throws when a fallback entry is a real directory', () => {
     const anchor = stageInstallation({})
     const home = tmp()
