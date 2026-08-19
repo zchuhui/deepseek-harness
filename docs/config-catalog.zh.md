@@ -2409,6 +2409,51 @@ export interface Config {
 
 来源：[`packages/terminal/terminal-bash/src/config.ts:6`](../packages/terminal/terminal-bash/src/config.ts)
 
+<a id="deepseek-aidsh-terminal-pwsh"></a>
+
+## `@deepseek-ai/dsh-terminal-pwsh`
+
+需要：`terminals` · `sandboxPolicy` · `subprocess`
+
+```ts config-catalog
+/** Public plugin configuration. */
+export interface Config {
+  /** Backend registry type (default: `shell`). */
+  backendType?: string
+  /** Interactive PowerShell executable (default: {@link resolvePwshPath}). */
+  shellPath?: string
+  /** Shell arguments (default: `-NoLogo -NoProfile -NoExit` plus the controlled prompt command). */
+  shellArgs?: string[]
+  /** Terminal rows. */
+  rows?: number
+  /** Terminal columns. */
+  cols?: number
+  /** Maximum retained logical lines. */
+  scrollbackLines?: number
+  /** Maximum retained UTF-8 bytes. */
+  scrollbackMaxBytes?: number
+  /** Maximum bytes returned by one read or settled viewport. */
+  maxReadBytes?: number
+  /** Readiness polling interval. */
+  pollIntervalMs?: number
+  /** Delay before Linux exact syscall probes. */
+  exactProbeAfterMs?: number
+  /** Silence duration that yields `inferred_idle`. */
+  idleSilenceMs?: number
+  /**
+   * Extra wait beyond `idleSilenceMs`, once a prompt marker was seen, for the shell to
+   * regain the foreground before `inferred_idle` settles; at least one `pollIntervalMs`.
+   */
+  handoffGraceMs?: number
+  /** Absolute send wait bound. */
+  timeoutMs?: number
+  /** Grace before teardown escalates to `SIGKILL`. */
+  disposeGraceMs?: number
+}
+```
+
+来源：[`packages/terminal/terminal-pwsh/src/config.ts:7`](../packages/terminal/terminal-pwsh/src/config.ts)
+
 <a id="deepseek-aidsh-time-context"></a>
 
 ## `@deepseek-ai/dsh-time-context`

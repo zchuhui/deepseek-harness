@@ -4,7 +4,7 @@
   "license": "MIT",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.22.0+sha512.1ff870c4c6133dfd88fb2afc46dd13d47f09c9794b438c6fdb47ca98caf3bc16381ee0be93a091b8e3824cf01f889f46d7d9e20910fb0be1ab0fb5baa80dd621",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
@@ -58,6 +58,8 @@
     "check:windows-wine": "bash scripts/wine-windows-gates.sh",
     "check:ci:windows-blocking": "tsx scripts/run-gates.ts ci-windows-blocking",
     "check:ci:windows-complete": "tsx scripts/run-gates.ts ci-windows-complete",
+    "check:ci:windows-core": "tsx scripts/run-gates.ts ci-windows-core",
+    "test:windows-core": "vitest run packages/sandbox/sandbox-windows-acl packages/hooks/hook-protocol packages/terminal/terminal-pwsh packages/subprocess/subprocess-local/tests/process-inspector.spec.ts packages/subprocess/subprocess-local/tests/win32-job.spec.ts packages/subprocess/subprocess-local/tests/spawn-job.spec.ts",
     "check:ci:windows-observational": "tsx scripts/run-gates.ts ci-windows-observational",
     "check:node-compat": "tsx scripts/run-gates.ts node-compat",
     "knip": "knip --treat-config-hints-as-errors",

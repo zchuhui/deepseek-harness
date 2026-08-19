@@ -147,6 +147,7 @@ export class WebServer extends Service {
   /** Listen; resolves once the socket is bound (rejection = FAILED fiber). */
   async [Service.init](): Promise<void> {
     const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+      applyLoopbackCors(req, res)
       /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
       requests; the field is only optional on the client-side IncomingMessage type */
       const rawPath = new URL(req.url ?? '/', 'http://x').pathname
@@ -261,6 +262,36 @@ export class WebServer extends Service {
     for (const transform of this.indexTaps) out = transform(out)
     return out
   }
+}
+
+/**
+ * Reflect `Access-Control-Allow-Origin` only for loopback pages. Vite emits
+ * `<script type="module" crossorigin>`, so WebView2 fetches those modules in
+ * CORS mode and refuses them without this header; a non-loopback Origin stays
+ * unreflected so a remote site cannot read the server.
+ */
+function applyLoopbackCors(req: IncomingMessage, res: ServerResponse): void {
+  const origin = req.headers.origin
+  if (typeof origin !== 'string' || origin === '') return
+  if (origin === 'null') {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    return
+  }
+  let hostname: string
+  try {
+    hostname = new URL(origin).hostname
+  } catch {
+    return
+  }
+  if (!isLoopbackCorsHostname(hostname)) return
+  res.setHeader('Access-Control-Allow-Origin', origin)
+}
+
+/** Loopback and WebView embedder hostnames that may read this server via CORS. */
+function isLoopbackCorsHostname(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname === '[::1]') return true
+  const parts = hostname.split('.')
+  return parts.length === 4 && parts[0] === '127' && parts.every(part => /^\d{1,3}$/.test(part))
 }
 
 export default WebServer

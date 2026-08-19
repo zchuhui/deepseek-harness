@@ -54,6 +54,8 @@ import * as abi from './win32-abi.ts'
 
 export { quoteArg } from './spawn.ts'
 export { AclWriteGrant } from './grant.ts'
+export { describeGrantRootWarnings, isFatFileSystem, isWideGrantRoot, readFileSystemType } from './grant-warnings.ts'
+export type { GrantRootWarning } from './grant-warnings.ts'
 export { assertTempRootOutsideWorkspace } from './path-boundary.ts'
 export { tempWriteSid, workspaceWriteSid } from './workspace-sid.ts'
 export { Win32Error } from './errors.ts'

@@ -24,4 +24,4 @@ The prompt section sits near the system prompt's head and is stable for the life
 
 - **The frontend dist must be built** — `require.resolve` of the dist fails loud at activation with a build hint; there is no source-serving fallback.
 - **`lanAddresses` is a boot-time snapshot** — interface changes after boot are not re-advertised; the printed LAN URL always matches the configured trust fence.
-- **Desktop readiness is opt-in** — when `DSH_DESKTOP_WEB_TOKEN` is set, the bundle exposes a loopback readiness route that requires the matching header and injects a restrictive CSP into index responses; ordinary Web deployments do neither.
+- **Desktop readiness is opt-in** — when `DSH_DESKTOP_WEB_TOKEN` is set, the bundle exposes a loopback readiness route that requires the matching header and injects a CSP that allows the inline boot payload and the Vite bundle's `new Function` path (`script-src 'self' 'unsafe-inline' 'unsafe-eval'`); ordinary Web deployments do neither.

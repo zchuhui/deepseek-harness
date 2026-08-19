@@ -72,14 +72,12 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
   }
 
   // node-pty writes synchronously; the seam returns a promise for remote transports.
-  // oxlint-disable-next-line typescript/require-await -- Preserve promise rejection semantics at the async provider contract.
   async write(data: string): Promise<void> {
     if (this.exited) throw new Error('terminal process has exited')
     this.terminal.write(data)
   }
 
   // Local inspection is synchronous; the seam returns a promise for remote transports.
-  // oxlint-disable-next-line typescript/require-await -- Preserve promise rejection semantics at the async provider contract.
   async inspectForeground(): Promise<SubprocessTerminalForeground | undefined> {
     this.descendants()
     const processGroupId = this.inspector.foregroundPgid(this.pid)
@@ -98,6 +96,12 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
     if (signal === 'SIGKILL' && foreground.processGroupId === this.pid) {
       throw new Error('refusing to SIGKILL the terminal shell; terminate the terminal session instead')
     }
+    /* v8 ignore start -- ConPTY interrupt; native Windows PTY suites pin this arm. */
+    if (process.platform === 'win32' && (signal === 'SIGINT' || signal === 'SIGTSTP')) {
+      this.terminal.write('\x03')
+      return foreground.processGroupId
+    }
+    /* v8 ignore stop */
     this.inspector.signalGroup(foreground.processGroupId, signal)
     return foreground.processGroupId
   }

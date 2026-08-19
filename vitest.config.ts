@@ -28,7 +28,8 @@ const windowsUnsupportedPackages = process.platform === 'win32'
       'packages/shell/bash-local',
       'packages/shell/bash-sandbox',
       'packages/shell/tool-bash',
-      'packages/hooks/*',
+      'packages/hooks/hooks-claude-code',
+      'packages/hooks/hooks-codex',
       'packages/terminal/terminal-bash',
       'packages/sandbox/sandbox-local',
     ]
@@ -39,7 +40,6 @@ const windowsUnsupportedTests = process.platform === 'win32'
       ...windowsUnsupportedPackages.map(path => `${path}/tests/**/*.spec.ts`),
       'packages/subprocess/subprocess/tests/**/*.spec.ts',
       'packages/subprocess/subprocess-local/tests/local.spec.ts',
-      'packages/subprocess/subprocess-local/tests/process-inspector.spec.ts',
       'packages/subprocess/subprocess-local/tests/spawn.spec.ts',
       'packages/subprocess/subprocess-local/tests/terminal.spec.ts',
     ]

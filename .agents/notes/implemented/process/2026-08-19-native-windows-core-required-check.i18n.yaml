@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-08-19-native-windows-core-required-check.md
+2026-08-19-native-windows-core-required-check.md: bc2774013184b2e8de68dbd8a1ce4826187ac3f2
+2026-08-19-native-windows-core-required-check.zh.md: 0fd3979783d88de3095832199d068fd11439d058

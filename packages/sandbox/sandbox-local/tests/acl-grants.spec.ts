@@ -22,6 +22,7 @@ const mockState = vi.hoisted(() => ({
   addFailureStanding: undefined as boolean | undefined,
   createTempFailure: undefined as Error | undefined,
   disposeFailure: undefined as Error | undefined,
+  warnings: [] as Array<{ kind: string; message: string }>,
 }))
 
 vi.mock('@deepseek-ai/dsh-sandbox-windows-acl', () => {
@@ -60,6 +61,8 @@ vi.mock('@deepseek-ai/dsh-sandbox-windows-acl', () => {
     },
     workspaceWriteSid: () => 'S-1-4-42-42',
     tempWriteSid: (path: string) => `TEMP:${path}`,
+    describeGrantRootWarnings: () => mockState.warnings,
+    readFileSystemType: () => undefined,
   }
 })
 
@@ -91,6 +94,7 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
     mockState.addFailureStanding = undefined
     mockState.createTempFailure = undefined
     mockState.disposeFailure = undefined
+    mockState.warnings = []
   })
 
   const cleanup = () => {
@@ -138,6 +142,21 @@ describe('windows-acl write grants (LocalSandboxProvider)', () => {
       await fiber.dispose()
       expect(mockState.grants.every(grant => grant.disposed)).toBe(true)
       expect(existsSync(tempDir ?? '')).toBe(false)
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('logs grant-root warnings on the first standing workspace ACE', async () => {
+    try {
+      const { ctx, sandbox } = await setup()
+      const logged: string[] = []
+      ctx.logger.warn = ((message: unknown) => { logged.push(String(message)) }) as typeof ctx.logger.warn
+      mockState.warnings = [{ kind: 'wide-directory', message: 'wide root' }]
+      const ws = workspaceRoot()
+      scratch.push(ws)
+      sandbox.confine(['pwsh', '/Command', 'x'], { mode: 'workspace-write', workspaceRoot: ws, sessionId: SessionId('sess-warn') })
+      expect(logged).toContain('wide root')
     } finally {
       cleanup()
     }

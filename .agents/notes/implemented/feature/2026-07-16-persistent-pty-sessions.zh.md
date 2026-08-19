@@ -16,7 +16,7 @@ harness 可以运行前台与后台命令、编辑文件和委派工作，但无
 
 可选的 `packages/terminal/` 能力家族提供由 agent（智能体）拥有、持久化且面向行式交互的 PTY 会话。它遵循仓库的 [能力模式](../../implemented/architecture/2026-06-13-capability-seams.md)，与现有命令和文件系统工具并存，并且不修改 `agent-loop`。
 
-当前实现在 Linux 和 macOS 上支持交互式 shell 与行式 REPL。全屏终端应用、按键序列、BEL 触发的控制流、进程丢失后的会话恢复以及跨 agent 共享会话都明确推迟。
+当前实现在 Linux 和 macOS 上支持交互式 bash PTY，并在 Windows 上支持非受限 pwsh PTY。全屏终端应用、按键序列、BEL 触发的控制流、进程丢失后的会话恢复以及跨 agent 共享会话都明确推迟。
 
 ### 包拓扑
 
@@ -134,7 +134,7 @@ plugins:
 - 声明式 per-agent 启动需要 agent-setup 组合点；仍然禁止插件加载期全局会话。
 - harness 进程丢失后的会话恢复需要进程外 owner 和版本化协议。
 - 网络出口策略与外部副作用回滚超出 PTY 范围，继续作为独立安全工作。
-- Windows/ConPTY 支持需要具备 Windows 原生进程所有权与信号语义的后端。
+- Windows 宿主使用 `dsh-terminal-pwsh`（ConPTY、启发式空闲、拒绝受限 PTY）。见 [Windows ConPTY 检查](2026-08-19-windows-pty-conpty.md) 和 [terminal-pwsh](2026-08-19-terminal-pwsh.md)。
 
 ## 备选方案
 

@@ -61,10 +61,18 @@ async function loadComposition(port = 0): Promise<Context> {
   return context
 }
 
-/** GET (by default) one path against the running server; returns status plus a body prefix. */
-async function request(port: number, path: string, init?: RequestInit): Promise<{ status: number; body: string }> {
+/** GET (by default) one path against the running server; returns status, body prefix, and CORS header. */
+async function request(
+  port: number,
+  path: string,
+  init?: RequestInit,
+): Promise<{ status: number; body: string; allowOrigin: string | null }> {
   const response = await fetch(`http://127.0.0.1:${String(port)}${path}`, init)
-  return { status: response.status, body: (await response.text()).slice(0, 80) }
+  return {
+    status: response.status,
+    body: (await response.text()).slice(0, 80),
+    allowOrigin: response.headers.get('access-control-allow-origin'),
+  }
 }
 
 /** Open one raw upgrade request and return after the handler writes its response. */
@@ -112,6 +120,27 @@ describe('real Loader composition', () => {
     expect(await request(port, '/api/deep/leaf')).toMatchObject({ status: 200, body: 'DEEP' })
     expect(await request(port, '/api')).toMatchObject({ status: 200, body: 'API' })
     expect(await request(port, '/api/anything', { method: 'POST' })).toMatchObject({ status: 200, body: 'API' })
+
+    // Loopback CORS: WebView2 loads Vite `crossorigin` modules only when ACAO
+    // reflects a loopback Origin or the literal `null`; other origins stay closed.
+    expect((await request(port, '/probe')).allowOrigin).toBeNull()
+    expect(
+      (await request(port, '/probe', { headers: { Origin: 'http://127.0.0.1:3081' } })).allowOrigin,
+    ).toBe('http://127.0.0.1:3081')
+    expect(
+      (await request(port, '/probe', { headers: { Origin: 'http://localhost:3080' } })).allowOrigin,
+    ).toBe('http://localhost:3080')
+    expect(
+      (await request(port, '/probe', { headers: { Origin: 'https://tauri.localhost' } })).allowOrigin,
+    ).toBe('https://tauri.localhost')
+    expect(
+      (await request(port, '/probe', { headers: { Origin: 'http://[::1]:3080' } })).allowOrigin,
+    ).toBe('http://[::1]:3080')
+    expect((await request(port, '/probe', { headers: { Origin: 'null' } })).allowOrigin).toBe('*')
+    expect((await request(port, '/probe', { headers: { Origin: 'https://evil.example' } })).allowOrigin).toBeNull()
+    expect((await request(port, '/probe', { headers: { Origin: 'http://10.0.0.1' } })).allowOrigin).toBeNull()
+    expect((await request(port, '/probe', { headers: { Origin: 'not a url' } })).allowOrigin).toBeNull()
+    expect((await request(port, '/probe', { headers: { Origin: '' } })).allowOrigin).toBeNull()
 
     // Fallback seat: 404 while unclaimed; the owner answers everything no
     // named route matches; index taps are the owner's to apply; the seat

@@ -140,7 +140,8 @@ spawn 会立即返回一个活动句柄。收集模式的读取器接受全流�
  *
  * Termination is tree-scoped everywhere: POSIX signals the detached process
  * group (falling back to the direct child when the group is gone), Windows
- * terminates the tree via `taskkill /T`, so helper processes cannot outlive
+ * terminates the tree via a kill-on-close Job Object (falling back to
+ * `taskkill /T` when job attachment fails), so helper processes cannot outlive
  * the handle unnoticed.
  */
 interface SubprocessHandle {

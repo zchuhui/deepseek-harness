@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-windows-job-object-process-trees.md
+2026-08-19-windows-job-object-process-trees.md: 86d4ad2874d6ec84c0365c589851271ca4a53bfc
+2026-08-19-windows-job-object-process-trees.zh.md: bfee7f439b9e6ba1d3fccaaa13f4e4a118f60b4b

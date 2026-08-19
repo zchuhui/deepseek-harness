@@ -161,7 +161,8 @@ export interface SubprocessCollectedOutputs {
  *
  * Termination is tree-scoped everywhere: POSIX signals the detached process
  * group (falling back to the direct child when the group is gone), Windows
- * terminates the tree via `taskkill /T`, so helper processes cannot outlive
+ * terminates the tree via a kill-on-close Job Object (falling back to
+ * `taskkill /T` when job attachment fails), so helper processes cannot outlive
  * the handle unnoticed.
  */
 export interface SubprocessHandle {
