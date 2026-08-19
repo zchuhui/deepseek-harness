@@ -36,19 +36,34 @@ if (actualHash !== expectedHash) throw new Error(`NODE_RUNTIME_SHA256 mismatch f
 
 rmSync(runtimeRoot, { recursive: true, force: true })
 mkdirSync(runtimeRoot, { recursive: true })
+// pnpm deploy runs a filtered production install from the repository root and
+// rewrites the source workspace state (node_modules/.pnpm-workspace-state-v1.json)
+// with production/filtered install settings. Preserve the pre-deploy bytes so
+// the next `pnpm run`/pre-push hook does not auto-run `pnpm install
+// --production`, which strips devDependencies from the development checkout.
+const workspaceStatePath = join(repositoryRoot, 'node_modules', '.pnpm-workspace-state-v1.json')
+const workspaceStateBefore = existsSync(workspaceStatePath) ? readFileSync(workspaceStatePath) : undefined
 try {
-  execFileSync('pnpm', [
-    '--filter', '@deepseek-ai/dsh', 'deploy',
-    '--legacy', '--prod',
-    '--config.node-linker=hoisted',
-    '--config.auto-install-peers=false',
-    '--config.link-workspace-packages=true',
-    runtimeRoot,
-  ], {
-    cwd: repositoryRoot,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  })
+  try {
+    execFileSync('pnpm', [
+      '--filter', '@deepseek-ai/dsh', 'deploy',
+      '--legacy', '--prod',
+      '--config.node-linker=hoisted',
+      '--config.auto-install-peers=false',
+      '--config.link-workspace-packages=true',
+      runtimeRoot,
+    ], {
+      cwd: repositoryRoot,
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    })
+  } finally {
+    if (workspaceStateBefore === undefined) {
+      rmSync(workspaceStatePath, { force: true })
+    } else {
+      writeFileSync(workspaceStatePath, workspaceStateBefore)
+    }
+  }
   // pnpm deploy lays the CLI package out at the target root: lib/bin.js.
   const cli = join(runtimeRoot, 'lib', 'bin.js')
   if (!existsSync(cli)) throw new Error(`pnpm deploy did not stage the dsh CLI: ${cli}`)

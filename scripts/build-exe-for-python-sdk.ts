@@ -247,17 +247,35 @@ class SingleExeBuild {
     }
     if (this.cli.dryRun) console.log(`build-exe-for-python-sdk: [dry-run] rm -rf ${this.staging}`)
     else await rm(this.staging, { recursive: true, force: true })
-    await this.run('deploy', pnpmBin(), [
-      '--filter',
-      DEPLOY_ROOT_PACKAGE,
-      'deploy',
-      '--legacy',
-      '--prod',
-      '--config.node-linker=hoisted',
-      '--config.auto-install-peers=false',
-      '--config.link-workspace-packages=true',
-      this.staging,
-    ])
+    // pnpm deploy runs a filtered production install from the repository root
+    // and rewrites the source workspace state with production/filtered install
+    // settings. Preserve the pre-deploy bytes so the next `pnpm run`/pre-push
+    // hook does not auto-run `pnpm install --production` against the dev checkout.
+    const workspaceStatePath = join(root, 'node_modules', '.pnpm-workspace-state-v1.json')
+    const workspaceStateBefore = this.cli.dryRun
+      ? undefined
+      : existsSync(workspaceStatePath) ? await readFile(workspaceStatePath) : undefined
+    try {
+      await this.run('deploy', pnpmBin(), [
+        '--filter',
+        DEPLOY_ROOT_PACKAGE,
+        'deploy',
+        '--legacy',
+        '--prod',
+        '--config.node-linker=hoisted',
+        '--config.auto-install-peers=false',
+        '--config.link-workspace-packages=true',
+        this.staging,
+      ])
+    } finally {
+      if (!this.cli.dryRun) {
+        if (workspaceStateBefore === undefined) {
+          await rm(workspaceStatePath, { force: true })
+        } else {
+          await writeFile(workspaceStatePath, workspaceStateBefore)
+        }
+      }
+    }
     await this.restoreLegacyHoists()
     await this.materializeStagedLinks()
     if (this.cli.dryRun) {
