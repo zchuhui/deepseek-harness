@@ -11,7 +11,7 @@ import { DesktopBridge, ENV_BRIDGE_TOKEN, ENV_BRIDGE_URL } from '@deepseek-ai/ds
 import { NotificationService } from '@deepseek-ai/dsh-notifications'
 import type { Notification } from '@deepseek-ai/dsh-notifications'
 
-/** Plugin config: bridge connection overrides and timeout. */
+/** Plugin config: bridge connection overrides, timeout, and background suppression policy. */
 export interface Config {
   /** Bridge URL override; defaults to the shell-exported environment. */
   bridgeUrl?: string
@@ -19,6 +19,8 @@ export interface Config {
   bridgeToken?: string
   /** Per-request timeout in milliseconds; defaults to 5000. */
   timeoutMs?: number
+  /** Notification kinds the shell suppresses while any window is foreground; defaults to ['turn-completed']. */
+  backgroundOnlyKinds?: string[]
 }
 
 /** Fully resolved connection parameters; defaulting happens here, never inline. */
@@ -26,6 +28,7 @@ export interface ResolvedSpec {
   url: string
   token: string
   timeoutMs: number
+  backgroundOnlyKinds: string[]
 }
 
 /**
@@ -42,17 +45,19 @@ export function resolveSpec(config: Config, env: NodeJS.ProcessEnv = process.env
   if (url === undefined || url === '' || token === undefined || token === '') {
     throw new Error('notifications-desktop requires the desktop bridge environment (DSH_DESKTOP_BRIDGE_URL and DSH_DESKTOP_BRIDGE_TOKEN); compose it only under the desktop shell')
   }
-  return { url, token, timeoutMs: config.timeoutMs ?? 5000 }
+  return { url, token, timeoutMs: config.timeoutMs ?? 5000, backgroundOnlyKinds: config.backgroundOnlyKinds ?? ['turn-completed'] }
 }
 
 /** The ctx.notifications desktop-toast implementation. */
 export default class DesktopNotifications extends NotificationService {
   private readonly bridge: DesktopBridge
+  private readonly backgroundOnlyKinds: string[]
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx)
     const spec = resolveSpec(config)
     this.bridge = new DesktopBridge({ url: spec.url, token: spec.token, timeoutMs: spec.timeoutMs })
+    this.backgroundOnlyKinds = spec.backgroundOnlyKinds
   }
 
   /**
@@ -60,6 +65,7 @@ export default class DesktopNotifications extends NotificationService {
    * @param notification - the notification to render.
    */
   notify(notification: Notification): Promise<void> {
-    return this.bridge.toast(notification.title, notification.body, notification.sessionId)
+    const backgroundOnly = this.backgroundOnlyKinds.includes(notification.kind)
+    return this.bridge.toast(notification.title, notification.body, notification.sessionId, backgroundOnly)
   }
 }

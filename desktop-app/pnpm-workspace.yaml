@@ -1,3 +1,5 @@
 # desktop-app is deliberately outside the repository's pnpm workspace: this empty
 # workspace file makes pnpm treat it as its own install root (see README).
 packages: []
+allowBuilds:
+  sharp: true

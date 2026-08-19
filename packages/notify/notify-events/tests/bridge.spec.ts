@@ -102,12 +102,25 @@ describe('notify-events bridge', () => {
     await fiber.dispose()
   })
 
-  it('does not raise for a completed turn', async () => {
+  it('does not raise for a completed turn by default', async () => {
     const { fiber } = await harness()
     const session = context!.sessions.create(SessionId('bridge-turn-ok'))
     session.append('turn/start', { turn: 1 })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     expect(notifications!.delivered).toHaveLength(0)
+    await fiber.dispose()
+  })
+
+  it('raises turn-completed when opted in', async () => {
+    const { fiber } = await harness({ turnCompleted: true })
+    const session = context!.sessions.create(SessionId('bridge-turn-done'))
+    session.append('turn/start', { turn: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    const notice = notifications!.delivered[0]!
+    expect(notice.kind).toBe('turn-completed')
+    expect(notice.title).toBe('任务完成')
+    expect(notice.body).toBe('回复已生成')
+    expect(notice.sessionId).toBe(SessionId('bridge-turn-done'))
     await fiber.dispose()
   })
 
@@ -224,12 +237,13 @@ describe('render helpers', () => {
   it('renders turn and tool failures', () => {
     expect(bridge.turnNotice(SessionId('s1'), { message: 'boom', code: 'NETWORK' }).body).toBe('boom')
     expect(bridge.toolNotice(SessionId('s1'), { name: 'BashError', code: 'EXIT_1' }).body).toBe('BashError (EXIT_1)')
+    expect(bridge.turnCompletedNotice(SessionId('s1'))).toEqual({ kind: 'turn-completed', title: '任务完成', body: '回复已生成', sessionId: SessionId('s1') })
   })
 
   it('resolves defaults and explicit switches', () => {
-    const defaults = { jobSettled: true, approvalWaiting: true, turnFailed: true, toolFailed: false }
+    const defaults = { jobSettled: true, approvalWaiting: true, turnFailed: true, turnCompleted: false, toolFailed: false }
     expect(bridge.resolveSpec({})).toEqual(defaults)
-    const explicit = { jobSettled: false, approvalWaiting: false, turnFailed: false, toolFailed: true }
+    const explicit = { jobSettled: false, approvalWaiting: false, turnFailed: false, turnCompleted: true, toolFailed: true }
     expect(bridge.resolveSpec(explicit)).toEqual(explicit)
   })
 })

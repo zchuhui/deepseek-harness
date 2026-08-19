@@ -7,9 +7,11 @@
     "tauri": "tauri",
     "icon": "tauri icon icon-source.png",
     "stage-runtime": "node scripts/stage-runtime.mjs",
+    "gen-installer-art": "node scripts/gen-installer-art.mjs",
     "build:release": "node scripts/build-and-sign.mjs"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.1.0"
+    "@tauri-apps/cli": "^2.1.0",
+    "sharp": "^0.33.5"
   }
 }

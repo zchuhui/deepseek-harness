@@ -28,7 +28,11 @@ cargo build
 cargo test
 ```
 
-## 配置(环境变量)
+## 安装器品牌
+
+NSIS 安装器已本地化为简体中文（`bundle.windows.nsis.languages: ["SimpChinese"]`），并把应用图标作为安装器图标，同时携带品牌头图 / 侧图（`icons/installer/*.bmp`）。用 `pnpm run gen-installer-art` 从 `website/public` 的规范矢量资产重新生成这两张位图。
+
+## 配置（环境变量）
 
 | 变量 | 默认值 | 含义 |
 |---|---|---|
@@ -60,7 +64,7 @@ Windows 与 Linux 上,协议启动会拉起第二个进程;`tauri-plugin-single-
 
 | 端点 | 方法 | 契约 |
 |---|---|---|
-| `/api/desktop/toast` | POST | `{ title, body, sessionId? }` 展示一条原生通知；安全的 `sessionId` 成为待跳转深链,并在 Windows 上成为 toast 的协议激活目标(`dsh://session/<id>`) |
+| `/api/desktop/toast` | POST | `{ title, body, sessionId?, backgroundOnly? }` 展示一条原生通知；安全的 `sessionId` 成为待跳转深链,并在 Windows 上成为 toast 的协议激活目标(`dsh://session/<id>`)；`backgroundOnly: true` 时,若任一壳窗口持有焦点则抑制该 toast |
 | `/api/desktop/pick-directory` | POST | 打开原生目录选择器;`{ path }` 或 `{ canceled: true }` |
 | `/api/desktop/keychain/{name}` | GET/POST/DELETE | 读取(`{ value }` 或 404)、存储(`{ value }`,非空)、删除 —— 经 `keyring` crate 使用 Windows 凭据管理器 |
 | `/api/desktop/windows/open` | POST | `{ sessionId? }` 新建一个窗口(id 须安全)并登记;`{ label, sessionId }` |

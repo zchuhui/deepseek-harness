@@ -188,6 +188,15 @@ fn toast(app: &AppHandle, body: &str) -> Response<std::io::Cursor<Vec<u8>>> {
     };
     let session_id = payload.get("sessionId").and_then(|v| v.as_str());
     let launch = session_id.filter(|id| crate::deeplink::is_safe_session_id(id));
+    // A background-only toast is a reminder the operator only needs when the
+    // shell is not in view; suppress it while any window holds focus.
+    let background_only = payload
+        .get("backgroundOnly")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+    if background_only && crate::windows::is_any_window_focused(app) {
+        return json_response(200, serde_json::json!({ "shown": false, "suppressed": true }));
+    }
     if let Some(id) = launch {
         if let Some(slot) = app.try_state::<crate::deeplink::PendingDeepLink>() {
             if let Ok(mut guard) = slot.0.lock() {

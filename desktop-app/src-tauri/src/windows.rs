@@ -5,7 +5,9 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -150,6 +152,38 @@ pub fn focus_window(app: &AppHandle, label: &str) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+/**
+ * Whether any registered window currently holds focus. Focus reads dispatch
+ * to the main thread and wait for the answer; a dispatch or timeout failure
+ * answers false, so the caller shows the notification instead of dropping it.
+ * @param app - application handle.
+ * @returns true when at least one registered window is focused.
+ */
+pub fn is_any_window_focused(app: &AppHandle) -> bool {
+    let (sender, receiver) = mpsc::channel();
+    let handle = app.clone();
+    let dispatched = handle.run_on_main_thread({
+        let inner = handle.clone();
+        move || {
+            let focused = inner
+                .state::<WindowRegistry>()
+                .snapshot()
+                .into_iter()
+                .any(|(label, _)| {
+                    inner
+                        .get_webview_window(&label)
+                        .map(|window| window.is_focused().unwrap_or(false))
+                        .unwrap_or(false)
+                });
+            let _ = sender.send(focused);
+        }
+    });
+    if dispatched.is_err() {
+        return false;
+    }
+    receiver.recv_timeout(Duration::from_secs(1)).unwrap_or(false)
 }
 
 /**

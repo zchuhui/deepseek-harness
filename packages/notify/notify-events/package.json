@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-notify-events",
-  "description": "Event bridge for the notification seam: raises one notification per observed job settlement, approval request, failed turn, or opted-in failed tool call",
+  "description": "Event bridge for the notification seam: raises one notification per observed job settlement, approval request, failed or completed turn, or opted-in failed tool call",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

@@ -27,7 +27,11 @@
         "silent": true
       },
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/installer/headerImage.bmp",
+        "sidebarImage": "icons/installer/sidebarImage.bmp",
+        "languages": ["SimpChinese"]
       }
     },
     "icon": [

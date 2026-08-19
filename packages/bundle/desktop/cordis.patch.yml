@@ -1,0 +1,13 @@
+# The dsh-desktop bundle patch: the desktop shell's host-surface additions over
+# dsh-web-app, applied as the final layer of the `desktop` profile. It mounts
+# the notification bridge and the desktop toast provider, enabling operator
+# notifications with turn-completion reminders.
+
+- insert:
+    - id: notify-events
+      name: '@deepseek-ai/dsh-notify-events'
+      config:
+        turnCompleted: true
+
+    - id: notifications-desktop
+      name: '@deepseek-ai/dsh-notifications-desktop'

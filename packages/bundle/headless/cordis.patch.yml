@@ -33,3 +33,13 @@
       inject: [headlessStartup]
       config:
         task: !!js ctx.headlessStartup.task
+
+    # Operator notifications on the host console: background-job settlement,
+    # approval waiting, turn failure/completion, and opted-in tool failures.
+    - id: notify-events
+      name: '@deepseek-ai/dsh-notify-events'
+      config:
+        turnCompleted: true
+
+    - id: notifications-terminal
+      name: '@deepseek-ai/dsh-notifications-terminal'

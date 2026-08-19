@@ -53,6 +53,19 @@ describe('DesktopBridge', () => {
     await plain
   })
 
+  it('marks a toast backgroundOnly only when requested', async () => {
+    const stub = stubFetch()
+    const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })
+    const suppressed = bridge.toast('t', 'b', 'sess-1', true)
+    expect(JSON.parse(stub.calls[0]!.body!)).toEqual({ title: 't', body: 'b', sessionId: 'sess-1', backgroundOnly: true })
+    stub.respond(200, { shown: false, suppressed: true })
+    await suppressed
+    const shown = bridge.toast('t', 'b', undefined, false)
+    expect(JSON.parse(stub.calls[1]!.body!)).toEqual({ title: 't', body: 'b' })
+    stub.respond(200, { shown: true })
+    await shown
+  })
+
   it('maps a 404 keychain read to undefined and other statuses to errors', async () => {
     const stub = stubFetch()
     const bridge = new DesktopBridge({ url: 'http://127.0.0.1:3901', token: 'secret', fetchFn: stub.fetchFn })

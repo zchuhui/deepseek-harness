@@ -28,6 +28,10 @@ cargo build
 cargo test
 ```
 
+## Installer branding
+
+The NSIS installer is localized to Simplified Chinese (`bundle.windows.nsis.languages: ["SimpChinese"]`) and carries the app icon as the installer icon plus brand header/sidebar bitmaps (`icons/installer/*.bmp`). Regenerate those bitmaps from the canonical `website/public` vector assets with `pnpm run gen-installer-art`.
+
 ## Configuration (environment variables)
 
 | Variable | Default | Meaning |
@@ -60,7 +64,7 @@ Every request carries the header `x-dsh-bridge-token` with the run-scoped token;
 
 | Endpoint | Method | Contract |
 |---|---|---|
-| `/api/desktop/toast` | POST | `{ title, body, sessionId? }` shows one native notification; a safe `sessionId` becomes the pending deep link and, on Windows, the toast's protocol-activation launch target (`dsh://session/<id>`) |
+| `/api/desktop/toast` | POST | `{ title, body, sessionId?, backgroundOnly? }` shows one native notification; a safe `sessionId` becomes the pending deep link and, on Windows, the toast's protocol-activation launch target (`dsh://session/<id>`); `backgroundOnly: true` suppresses the toast while any shell window holds focus |
 | `/api/desktop/pick-directory` | POST | opens the native folder chooser; `{ path }` or `{ canceled: true }` |
 | `/api/desktop/keychain/{name}` | GET/POST/DELETE | read (`{ value }` or 404), store (`{ value }`, non-empty), delete — Windows Credential Manager via the `keyring` crate |
 | `/api/desktop/windows/open` | POST | `{ sessionId? }` opens one new window (the id must be safe) and registers it; `{ label, sessionId }` |

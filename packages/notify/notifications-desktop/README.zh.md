@@ -11,6 +11,7 @@
 | `bridgeUrl` | 壳导出的环境变量 | 桥接 URL 覆盖 |
 | `bridgeToken` | 壳导出的环境变量 | 桥接 token 覆盖 |
 | `timeoutMs` | 5000 | 单请求超时 |
+| `backgroundOnlyKinds` | `['turn-completed']` | 窗口在前台时壳抑制的通知类别 |
 
 ## 模型体验
 

@@ -112,10 +112,12 @@ export class DesktopBridge {
    * @param title - toast title.
    * @param body - toast body.
    * @param sessionId - optional session the shell deep-links to when the notification is opened.
+   * @param backgroundOnly - when true the shell suppresses the toast while any window is foreground.
    */
-  async toast(title: string, body: string, sessionId?: string): Promise<void> {
-    const payload: { title: string; body: string; sessionId?: string } = { title, body }
+  async toast(title: string, body: string, sessionId?: string, backgroundOnly = false): Promise<void> {
+    const payload: { title: string; body: string; sessionId?: string; backgroundOnly?: boolean } = { title, body }
     if (sessionId !== undefined) payload.sessionId = sessionId
+    if (backgroundOnly) payload.backgroundOnly = true
     await this.request('POST', '/api/desktop/toast', payload)
   }
 

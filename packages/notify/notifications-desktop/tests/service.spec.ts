@@ -33,13 +33,13 @@ function stubFetch(): { calls: StubCall[]; fetchFn: typeof fetch; respond: (stat
 }
 
 describe('resolveSpec', () => {
-  it('reads the shell-exported environment', () => {
-    expect(resolveSpec({}, { DSH_DESKTOP_BRIDGE_URL: 'http://127.0.0.1:3901', DSH_DESKTOP_BRIDGE_TOKEN: 't' })).toEqual({ url: 'http://127.0.0.1:3901', token: 't', timeoutMs: 5000 })
+  it('reads the shell-exported environment and defaults backgroundOnlyKinds', () => {
+    expect(resolveSpec({}, { DSH_DESKTOP_BRIDGE_URL: 'http://127.0.0.1:3901', DSH_DESKTOP_BRIDGE_TOKEN: 't' })).toEqual({ url: 'http://127.0.0.1:3901', token: 't', timeoutMs: 5000, backgroundOnlyKinds: ['turn-completed'] })
   })
 
   it('prefers explicit config over the environment', () => {
     const env = { DSH_DESKTOP_BRIDGE_URL: 'http://127.0.0.1:3901', DSH_DESKTOP_BRIDGE_TOKEN: 'env' }
-    expect(resolveSpec({ bridgeToken: 'cfg', timeoutMs: 900 }, env)).toEqual({ url: 'http://127.0.0.1:3901', token: 'cfg', timeoutMs: 900 })
+    expect(resolveSpec({ bridgeToken: 'cfg', timeoutMs: 900, backgroundOnlyKinds: ['turn-completed', 'job-settled'] }, env)).toEqual({ url: 'http://127.0.0.1:3901', token: 'cfg', timeoutMs: 900, backgroundOnlyKinds: ['turn-completed', 'job-settled'] })
   })
 
   it('throws at load when the bridge environment is missing', () => {
@@ -64,5 +64,25 @@ describe('DesktopNotifications', () => {
     expect(JSON.parse(stub.calls[0]!.body!)).toEqual({ title: '回合失败', body: '请求失败', sessionId: 'sess-9' })
     stub.respond(200, { shown: true })
     await done
+  })
+
+  it('marks a configured backgroundOnly kind and leaves other kinds plain', async () => {
+    vi.stubEnv('DSH_DESKTOP_BRIDGE_URL', 'http://127.0.0.1:3901')
+    vi.stubEnv('DSH_DESKTOP_BRIDGE_TOKEN', 'secret')
+    const stub = stubFetch()
+    vi.stubGlobal('fetch', stub.fetchFn)
+
+    context = new Context()
+    await context.plugin(DesktopNotifications, { backgroundOnlyKinds: ['turn-failed'] })
+
+    const failed = context.notifications.notify({ kind: 'turn-failed', title: '回合失败', body: '请求失败', sessionId: SessionId('sess-9') })
+    expect(JSON.parse(stub.calls[0]!.body!)).toEqual({ title: '回合失败', body: '请求失败', sessionId: 'sess-9', backgroundOnly: true })
+    stub.respond(200, { shown: false, suppressed: true })
+    await failed
+
+    const settled = context.notifications.notify({ kind: 'job-settled', title: '后台任务完成', body: 'bash: pnpm test' })
+    expect(JSON.parse(stub.calls[1]!.body!)).toEqual({ title: '后台任务完成', body: 'bash: pnpm test' })
+    stub.respond(200, { shown: true })
+    await settled
   })
 })

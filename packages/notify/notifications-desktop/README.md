@@ -11,6 +11,7 @@ Desktop provider for the [notification seam](../notifications/README.md): delive
 | `bridgeUrl` | shell-exported env | Bridge URL override |
 | `bridgeToken` | shell-exported env | Bridge token override |
 | `timeoutMs` | 5000 | Per-request timeout |
+| `backgroundOnlyKinds` | `['turn-completed']` | Notification kinds the shell suppresses while any window is foreground |
 
 ## Model Experience
 

@@ -1,9 +1,9 @@
 /**
  * Event bridge for the notification seam: raises one notification per
- * observed job settlement, approval request, failed turn, or (opted-in)
- * failed tool call. Every trigger source already exists in the harness —
- * the job registry's completion callback and durable session events — this
- * plugin only classifies and forwards them.
+ * observed job settlement, approval request, failed turn, completed turn, or
+ * (opted-in) failed tool call. Every trigger source already exists in the
+ * harness — the job registry's completion callback and durable session
+ * events — this plugin only classifies and forwards them.
  * @module @deepseek-ai/dsh-notify-events
  */
 
@@ -18,6 +18,7 @@ import type {} from '@deepseek-ai/dsh-user-approval'
 declare module '@deepseek-ai/dsh-notifications' {
   interface NotificationKindMap {
     'tool-failed': 'tool-failed'
+    'turn-completed': 'turn-completed'
   }
 }
 
@@ -35,6 +36,8 @@ export interface Config {
   approvalWaiting?: boolean
   /** Raise when a turn dies with an error; defaults to true. */
   turnFailed?: boolean
+  /** Raise when a turn completes; defaults to false — completion is frequent and often in view. */
+  turnCompleted?: boolean
   /** Raise on a failed tool call; defaults to false — tool failures are recoverable and frequent. */
   toolFailed?: boolean
 }
@@ -44,6 +47,7 @@ export const Config: z<Config> = z.object({
   jobSettled: z.boolean(),
   approvalWaiting: z.boolean(),
   turnFailed: z.boolean(),
+  turnCompleted: z.boolean(),
   toolFailed: z.boolean(),
 })
 
@@ -52,6 +56,7 @@ export interface ResolvedSpec {
   jobSettled: boolean
   approvalWaiting: boolean
   turnFailed: boolean
+  turnCompleted: boolean
   toolFailed: boolean
 }
 
@@ -65,6 +70,7 @@ export function resolveSpec(config: Config): ResolvedSpec {
     jobSettled: config.jobSettled ?? true,
     approvalWaiting: config.approvalWaiting ?? true,
     turnFailed: config.turnFailed ?? true,
+    turnCompleted: config.turnCompleted ?? false,
     toolFailed: config.toolFailed ?? false,
   }
 }
@@ -114,6 +120,15 @@ export function turnNotice(sessionId: SessionId, error: LlmFailure): Notificatio
 }
 
 /**
+ * Build the completion notification for one finished turn.
+ * @param sessionId - the session whose turn completed.
+ * @returns the notification.
+ */
+export function turnCompletedNotice(sessionId: SessionId): Notification {
+  return { kind: 'turn-completed', title: '任务完成', body: '回复已生成', sessionId }
+}
+
+/**
  * Build the failure notification for one failed tool call.
  * @param sessionId - the session whose tool call failed.
  * @param error - the durable tool/result failure identity.
@@ -146,7 +161,11 @@ export function apply(ctx: Context, config: Config = {}): void {
       return
     }
     if (event.type === 'turn/end') {
-      if (spec.turnFailed && event.data.reason.kind === 'error') raise(turnNotice(session.id, event.data.reason.error))
+      if (event.data.reason.kind === 'completed') {
+        if (spec.turnCompleted) raise(turnCompletedNotice(session.id))
+      } else if (event.data.reason.kind === 'error') {
+        if (spec.turnFailed) raise(turnNotice(session.id, event.data.reason.error))
+      }
       return
     }
     if (event.type === 'tool/result') {

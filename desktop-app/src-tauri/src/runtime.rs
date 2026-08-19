@@ -87,7 +87,8 @@ pub fn resolve_launch_spec(port: u16, start: &Path) -> Result<LaunchSpec, String
                 "--import".to_string(),
                 "tsx/esm".to_string(),
                 "apps/cli/src/bin.ts".to_string(),
-                "web".to_string(),
+                "--profile".to_string(),
+                "desktop".to_string(),
                 "--port".to_string(),
                 port.to_string(),
             ],
@@ -101,7 +102,8 @@ pub fn resolve_launch_spec(port: u16, start: &Path) -> Result<LaunchSpec, String
             vec![
                 "/C".to_string(),
                 "dsh.cmd".to_string(),
-                "web".to_string(),
+                "--profile".to_string(),
+                "desktop".to_string(),
                 "--port".to_string(),
                 port.to_string(),
             ],
@@ -109,7 +111,7 @@ pub fn resolve_launch_spec(port: u16, start: &Path) -> Result<LaunchSpec, String
     } else if which("dsh").is_some() {
         (
             "dsh".to_string(),
-            vec!["web".to_string(), "--port".to_string(), port.to_string()],
+            vec!["--profile".to_string(), "desktop".to_string(), "--port".to_string(), port.to_string()],
         )
     } else {
         return Err(
@@ -128,12 +130,8 @@ pub fn resolve_launch_spec(port: u16, start: &Path) -> Result<LaunchSpec, String
 pub fn resolve_bundled_launch_spec(port: u16, resource_dir: &Path) -> Result<LaunchSpec, String> {
     let runtime = resource_dir.join("runtime");
     let node = runtime.join("node.exe");
-    let cli = runtime
-        .join("node_modules")
-        .join("@deepseek-ai")
-        .join("dsh")
-        .join("lib")
-        .join("bin.js");
+    // pnpm deploy lays the dsh CLI package out at the runtime root.
+    let cli = runtime.join("lib").join("bin.js");
     if !node.is_file() || !cli.is_file() {
         return Err("desktop runtime is incomplete; reinstall DeepSeek Harness".to_string());
     }
@@ -141,7 +139,8 @@ pub fn resolve_bundled_launch_spec(port: u16, resource_dir: &Path) -> Result<Lau
         program: node.to_string_lossy().into_owned(),
         args: vec![
             cli.to_string_lossy().into_owned(),
-            "web".to_string(),
+            "--profile".to_string(),
+            "desktop".to_string(),
             "--host".to_string(),
             "127.0.0.1".to_string(),
             "--port".to_string(),
@@ -278,13 +277,25 @@ impl RuntimeManager {
         }
         #[cfg(windows)]
         command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        command.stderr(Stdio::piped());
         let mut child = command
             .spawn()
             .map_err(|error| format!("启动 dsh 失败: {error}"))?;
         let deadline = Instant::now() + Duration::from_secs(60);
         while Instant::now() < deadline {
             if let Some(status) = child.try_wait().map_err(|error| error.to_string())? {
-                return Err(format!("dsh 运行时在就绪前退出(退出码 {status})"));
+                // The release child runs detached, so an early exit is the only
+                // signal a failed boot leaves; surface its stderr instead of a
+                // bare exit code the operator cannot act on.
+                let mut detail = String::new();
+                if let Some(mut stderr) = child.stderr.take() {
+                    let _ = stderr.read_to_string(&mut detail);
+                }
+                let detail = detail.trim();
+                if detail.is_empty() {
+                    return Err(format!("dsh 运行时在就绪前退出(退出码 {status})"));
+                }
+                return Err(format!("dsh 运行时在就绪前退出(退出码 {status}): {detail}"));
             }
             let ready = extra_env
                 .iter()
