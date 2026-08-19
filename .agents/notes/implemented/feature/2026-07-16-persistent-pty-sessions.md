@@ -16,7 +16,7 @@ The existing `bash`, `read`, `write`, and `edit` tools remain the reliable defau
 
 The optional `packages/terminal/` capability family exposes agent-owned, persistent, line-oriented PTY sessions. It follows the repository's [capability pattern](../../implemented/architecture/2026-06-13-capability-seams.md), coexists with the existing command and filesystem tools, and does not change `agent-loop`.
 
-The implementation supports interactive shells and line-oriented REPLs on Linux and macOS. Full-screen terminal applications, keystroke sequences, BEL-triggered control flow, session restoration after process loss, and cross-agent session sharing are explicitly deferred.
+The implementation supports interactive bash PTY on Linux and macOS, and unconfined pwsh PTY on Windows. Full-screen terminal applications, keystroke sequences, BEL-triggered control flow, session restoration after process loss, and cross-agent session sharing are explicitly deferred.
 
 ### Package topology
 
@@ -134,7 +134,7 @@ The package ships concise tool guidance explaining persistent state, owner isola
 - Declarative per-agent startup requires an agent-setup composition point; plugin-load global sessions remain prohibited.
 - Session restoration across harness-process loss requires an out-of-process owner and a versioned protocol.
 - Network-egress policy and rollback of external side effects are broader than PTY and remain separate security work.
-- Windows/ConPTY support requires a backend with Windows-native process ownership and signaling semantics.
+- Windows hosts use `dsh-terminal-pwsh` (ConPTY, heuristic idle, confined PTY refused). See [Windows ConPTY inspection](2026-08-19-windows-pty-conpty.md) and [terminal-pwsh](2026-08-19-terminal-pwsh.md).
 
 ## Alternatives considered
 

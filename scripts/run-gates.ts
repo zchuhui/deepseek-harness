@@ -23,6 +23,7 @@ export type Mode =
   | 'ci-consumers'
   | 'ci-windows-blocking'
   | 'ci-windows-complete'
+  | 'ci-windows-core'
   | 'ci-windows-observational'
   | 'node-compat'
   | 'check-all'
@@ -108,6 +109,7 @@ function parseMode(raw: string | undefined): Mode {
     case 'ci-consumers':
     case 'ci-windows-blocking':
     case 'ci-windows-complete':
+    case 'ci-windows-core':
     case 'ci-windows-observational':
     case 'node-compat':
     case 'check-all':
@@ -115,7 +117,7 @@ function parseMode(raw: string | undefined): Mode {
       return raw
     default:
       throw new Error(
-        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-snapshot | ci-artifacts | ci-consumers | ci-windows-blocking | ci-windows-complete | ci-windows-observational | node-compat | check-all | doc-sync, got ${JSON.stringify(raw)}.`,
+        `run-gates: expected mode ci-primary | ci-linux-primary | ci-static | ci-lint-contracts-ready | ci-coverage | ci-snapshot | ci-artifacts | ci-consumers | ci-windows-blocking | ci-windows-complete | ci-windows-core | ci-windows-observational | node-compat | check-all | doc-sync, got ${JSON.stringify(raw)}.`,
       )
   }
 }
@@ -214,6 +216,8 @@ export function gatesForMode(selected: Mode): Gate[] {
       return ciWindowsBlockingGates()
     case 'ci-windows-complete':
       return ciWindowsCompleteGates()
+    case 'ci-windows-core':
+      return ciWindowsCoreGates()
     case 'ci-windows-observational':
       return ciWindowsObservationalGates()
     case 'node-compat':
@@ -423,6 +427,12 @@ function ciWindowsBlockingGates(): Gate[] {
   return [
     pnpmScript('windows-build', 'build', { label: 'build' }),
     pnpmScript('windows-site', 'docs:build', { label: 'production site' }),
+  ]
+}
+
+function ciWindowsCoreGates(): Gate[] {
+  return [
+    pnpmScript('windows-core-tests', 'test:windows-core', { label: 'native Windows core tests' }),
   ]
 }
 

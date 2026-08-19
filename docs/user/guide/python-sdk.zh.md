@@ -99,6 +99,6 @@ print(result.final_response)
 
 `cwd` 用于选择 agent 可访问的 workspace，`session_root` 用于保存会话日志和状态。独立任务应使用新的 session id；只有下一次调用需要延续同一段对话和持久 shell 状态时，才复用原有 id。
 
-该组合使用 `danger-full-access`。只能在可丢弃的 checkout 或容器内运行：Bash 与编辑器可以修改运行时进程有权访问的任何路径。持久 PTY 后端需要 POSIX 终端环境，因此该组合不支持 Windows agent。
+该组合使用 `danger-full-access`。只能在可丢弃的 checkout 或容器内运行：Bash 与编辑器可以修改运行时进程有权访问的任何路径。本示例装载 `terminal-bash`，因此不能在 Windows 上运行；Windows 持久终端在选择加入的组合中使用 [`dsh-terminal-pwsh`](../../../packages/terminal/terminal-pwsh/README.md)。见 [Windows 指南](./windows.md)。
 
 准确的组合内容归 [`jsonrpc-agent` 示例参考](../../../examples/jsonrpc-agent/README.md)所有。[Python SDK 参考](../../../python/sdk/README.md)介绍生命周期、结果、通知、运行时选择和配置；[Cordis primer](../../cordis-primer.md)介绍组合语法。

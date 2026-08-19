@@ -69,17 +69,32 @@ const DSH_WEB_URL = 'DSH_WEB_URL' as const
 /** Per-shell nonce that authorizes the native shell's loopback readiness probe. */
 export const DSH_DESKTOP_WEB_TOKEN = 'DSH_DESKTOP_WEB_TOKEN' as const
 
-/** CSP injected into the desktop-served index; native IPC stays unavailable to this page. */
-const DESKTOP_CSP = "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:"
+/**
+ * CSP injected into the desktop-served index; `'unsafe-inline'` covers the boot
+ * payload and theme scripts, and `'unsafe-eval'` covers the Vite bundle's
+ * `new Function` path. Native IPC stays unavailable to this page.
+ */
+const DESKTOP_CSP = [
+  "default-src 'self'",
+  "connect-src 'self'",
+  "font-src 'self' data:",
+  "img-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "worker-src 'self' blob:",
+].join('; ')
 
 /**
- * Add the desktop CSP before the document's closing head tag.
- * @param html - Served index document, with or without a closing head tag.
+ * Add the desktop CSP as the first child of the document head so it applies
+ * to later module scripts.
+ * @param html - Served index document, with or without an opening head tag.
  * @returns the document with the desktop CSP meta tag injected.
  */
 export function addDesktopCsp(html: string): string {
   const tag = `<meta http-equiv="Content-Security-Policy" content="${DESKTOP_CSP}">`
-  return html.includes('</head>') ? html.replace('</head>', `${tag}</head>`) : `${tag}${html}`
+  const head = html.indexOf('<head>')
+  if (head !== -1) return `${html.slice(0, head + 6)}${tag}${html.slice(head + 6)}`
+  return `${tag}${html}`
 }
 
 // Display-only mirror of the webserver schema's loopback host: the address the

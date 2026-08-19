@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { ShellExecRequest, ShellExecSpec, ShellExecutor, ShellRunResult } from '@deepseek-ai/dsh-shell'
-import { DEFAULT_HOOK_TIMEOUT_MS, runHook } from '@deepseek-ai/dsh-hook-protocol'
+import { DEFAULT_HOOK_TIMEOUT_MS, commandHasBashShebang, runHook } from '@deepseek-ai/dsh-hook-protocol'
 import type { RunHookOptions } from '@deepseek-ai/dsh-hook-protocol'
 
 /**
@@ -152,5 +152,52 @@ describe('runHook — outcome decoding + duration', () => {
     // A PreToolUse block on a Stop hook is malformed → its decision is discarded.
     expect(output.hookEventName).toBe('PreToolUse')
     expect(output.decision).toBeUndefined()
+  })
+})
+
+describe('runHook — Windows bash shebang', () => {
+  it('detects bash, env bash, and POSIX sh shebangs', () => {
+    expect(commandHasBashShebang('#!/bin/bash\necho hi')).toBe(true)
+    expect(commandHasBashShebang('#!/usr/bin/env bash\necho hi')).toBe(true)
+    expect(commandHasBashShebang('#!/bin/sh\necho hi')).toBe(true)
+    expect(commandHasBashShebang('Get-Date')).toBe(false)
+  })
+
+  it('rejects a bash shebang on Windows without spawning', async () => {
+    const { bash, specs } = recordingBash(async () => result())
+    const { output } = await runHook(
+      bash,
+      { command: '#!/bin/bash\necho hi' },
+      { payload: {}, signal: testSignal(), defaultTimeoutMs: 1000, trailingNewline: true },
+      clock(),
+      'win32',
+    )
+    expect(specs).toEqual([])
+    expect(output.exitCode).toBeUndefined()
+    expect(output.stderr).toContain('Windows hook commands run through PowerShell')
+  })
+
+  it('still runs a PowerShell command on Windows', async () => {
+    const { bash, specs } = recordingBash(async () => result())
+    await runHook(
+      bash,
+      { command: 'Get-Date' },
+      { payload: {}, signal: testSignal(), defaultTimeoutMs: 1000, trailingNewline: true },
+      clock(),
+      'win32',
+    )
+    expect(specs).toHaveLength(1)
+  })
+
+  it('still runs a shebang command on POSIX', async () => {
+    const { bash, specs } = recordingBash(async () => result())
+    await runHook(
+      bash,
+      { command: '#!/bin/bash\necho hi' },
+      { payload: {}, signal: testSignal(), defaultTimeoutMs: 1000, trailingNewline: true },
+      clock(),
+      'linux',
+    )
+    expect(specs).toHaveLength(1)
   })
 })

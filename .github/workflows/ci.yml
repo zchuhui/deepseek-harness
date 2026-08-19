@@ -488,6 +488,48 @@ jobs:
         shell: pwsh
         run: pnpm run check:ci:windows-complete
 
+  # Narrow required native kernel facts Wine cannot prove: ACL runner,
+  # ConPTY inspection, Job Objects, terminal-pwsh, and hook-protocol.
+  # The complete inventory stays on windows-native above. Topology:
+  # .agents/notes/implemented/process/2026-08-19-native-windows-core-required-check.md
+  windows-core:
+    if: github.event_name == 'pull_request'
+    runs-on: >-
+      ${{ vars.DSH_CI_FAILOVER_WINDOWS == 'selfhosted'
+          && github.event.pull_request.user.login != 'dependabot[bot]'
+          && fromJSON('["self-hosted", "dsh-win-ci", "windows"]')
+          || 'dsh-windows-2025-16core' }}
+    name: windows node 24 / native core
+    timeout-minutes: 30
+    env:
+      DSH_GATE_CONCURRENCY: '2'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Enable Developer Mode (symlink support)
+        shell: pwsh
+        run: >-
+          reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          /t REG_DWORD /f /v "AllowDevelopmentWithoutDevLicense" /d "1"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Run native Windows core tests
+        shell: pwsh
+        run: pnpm run check:ci:windows-core
+
   # The hosted reference jobs below are temporarily disabled; the self-hosted
   # standby remains active. Each enabled host executes the complete, unsharded
   # primary Node aggregate with one gate worker, giving reviewers a simple
@@ -904,9 +946,10 @@ jobs:
   # Single stable required check for branch protection: require "all checks
   # passed" instead of enumerating matrix legs whose names change as lanes and
   # node versions evolve. Every blocking job in THIS workflow must be listed in
-  # `needs`. The required Wine job is listed as `windows`; `windows-native` is
-  # deliberately absent so its independent result never delays or changes this
-  # verdict. (`needs` cannot reach across workflow files; e2e.yml stays its own
+  # `needs`. The required Wine job is listed as `windows`; `windows-core` is
+  # the required native subset. `windows-native` is deliberately absent so the
+  # complete inventory never delays or changes this verdict. (`needs` cannot
+  # reach across workflow files; e2e.yml stays its own
   # check.)
   # `if: always()` is load-bearing: without it a failed dependency
   # would SKIP this job, and GitHub counts a skipped required check as passing
@@ -925,7 +968,7 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows]
+    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows, windows-core]
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Fail if any needed job did not succeed

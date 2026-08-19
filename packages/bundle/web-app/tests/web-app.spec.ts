@@ -71,7 +71,9 @@ interface BashContribution {
 
 describe('web-app runtime glue', () => {
   it('injects the desktop CSP into the served document head', () => {
-    expect(addDesktopCsp('<head></head><body>shell</body>')).toContain('Content-Security-Policy')
+    const withHead = addDesktopCsp('<head><script>window.__DSH_BOOT__={}</script></head><body>shell</body>')
+    expect(withHead).toContain("script-src 'self' 'unsafe-inline' 'unsafe-eval'")
+    expect(withHead.indexOf('Content-Security-Policy')).toBeLessThan(withHead.indexOf('window.__DSH_BOOT__'))
     expect(addDesktopCsp('<body>shell</body>')).toMatch(/^<meta/)
   })
 

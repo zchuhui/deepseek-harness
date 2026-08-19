@@ -32,17 +32,19 @@ describe('CI workflow', () => {
     if (!isRecord(workflow.jobs)
       || !isRecord(workflow.jobs.windows)
       || !isRecord(workflow.jobs['windows-native'])
+      || !isRecord(workflow.jobs['windows-core'])
       || !isRecord(workflow.jobs['wine-apt-cache'])
       || !isRecord(workflow.jobs['serial-windows'])
       || !isRecord(workflow.jobs['node-24'])
       || !isRecord(workflow.jobs['node-24-coverage'])
       || !isRecord(workflow.jobs['node-24-consumers'])
       || !isRecord(workflow.jobs['all-checks-passed'])) {
-      throw new TypeError('CI workflow must define windows, windows-native, wine-apt-cache, serial-windows, node-24, node-24-coverage, node-24-consumers, and all-checks-passed jobs')
+      throw new TypeError('CI workflow must define windows, windows-native, windows-core, wine-apt-cache, serial-windows, node-24, node-24-coverage, node-24-consumers, and all-checks-passed jobs')
     }
 
     const windows = workflow.jobs.windows
     const windowsNative = workflow.jobs['windows-native']
+    const windowsCore = workflow.jobs['windows-core']
     const wineAptCache = workflow.jobs['wine-apt-cache']
     const serialWindows = workflow.jobs['serial-windows']
     const node24 = workflow.jobs['node-24']
@@ -77,6 +79,15 @@ describe('CI workflow', () => {
     ))
     expect(nativeCommandSteps.map(step => step.run)).toContain('pnpm run check:ci:windows-complete')
 
+    expect(typeof windowsCore['runs-on']).toBe('string')
+    expect(windowsCore['runs-on']).toContain('DSH_CI_FAILOVER_WINDOWS')
+    expect(windowsCore.name).toBe('windows node 24 / native core')
+    expect(windowsCore.if).toBe("github.event_name == 'pull_request'")
+    const coreCommandSteps = (windowsCore.steps as unknown[]).filter((step): step is Record<string, unknown> & { run: string } => (
+      isRecord(step) && typeof step.run === 'string'
+    ))
+    expect(coreCommandSteps.map(step => step.run)).toContain('pnpm run check:ci:windows-core')
+
     // wine-apt-cache: master-only, seeds the Wine apt cache.
     expect(wineAptCache.if).toBe("github.event_name == 'push' && github.ref == 'refs/heads/master'")
     expect(wineAptCache['runs-on']).toBe('ubuntu-latest')
@@ -86,8 +97,9 @@ describe('CI workflow', () => {
     expect(serialWindows['runs-on']).toEqual(['self-hosted', 'dsh-win-ci', 'windows'])
     expect(serialWindows.name).toBe('serial / windows (self-hosted standby)')
 
-    // Aggregate: Wine `windows` required, native `windows-native` excluded.
+    // Aggregate: Wine `windows` and native `windows-core` required; complete `windows-native` excluded.
     expect(aggregate.needs).toContain('windows')
+    expect(aggregate.needs).toContain('windows-core')
     expect(aggregate.needs).not.toContain('windows-native')
     expect(aggregate.needs).not.toContain('serial-windows')
 

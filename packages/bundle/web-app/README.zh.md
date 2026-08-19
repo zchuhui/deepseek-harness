@@ -24,4 +24,4 @@ dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 
 
 - **前端 dist 必须已构建**：对 dist 的 `require.resolve` 在激活时明确报错并给出构建提示；没有从源码直接服务的回退路径。
 - **`lanAddresses` 是启动期快照**：启动后的网卡变化不会重新公告；打印的 LAN URL 始终与配置的信任栅栏一致。
-- **桌面就绪检测是可选的**：设置 `DSH_DESKTOP_WEB_TOKEN` 时，本包暴露要求匹配 header 的 loopback 就绪路由，并向 index 响应注入严格 CSP；普通 Web 部署不会启用两者。
+- **桌面就绪检测是可选的**：设置 `DSH_DESKTOP_WEB_TOKEN` 时，本包暴露要求匹配 header 的 loopback 就绪路由，并向 index 响应注入允许内联 boot 载荷和 Vite 打包产物中 `new Function` 的 CSP（`script-src 'self' 'unsafe-inline' 'unsafe-eval'`）；普通 Web 部署不会启用两者。

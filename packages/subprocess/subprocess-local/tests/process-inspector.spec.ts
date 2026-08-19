@@ -243,6 +243,31 @@ describe('macOS process inspector', () => {
     expect(createProcessInspector('darwin', 'arm64', fake.internals).foregroundPgid(1)).toBeUndefined()
     fake.internals.exec = () => { throw new Error('gone') }
     expect(createProcessInspector('darwin', 'arm64', fake.internals).foregroundPgid(1)).toBeUndefined()
-    expect(() => createProcessInspector('win32', 'x64', fake.internals)).toThrow('unsupported on platform win32')
+    expect(() => createProcessInspector('freebsd', 'x64', fake.internals)).toThrow('unsupported on platform freebsd')
+  })
+})
+
+describe('Windows process inspector', () => {
+  it('maps the ConPTY root pid as the foreground id and identity-fences the tree', () => {
+    const fake = fakeInternals()
+    fake.setPs(' 10 1 20260101000000.000000+000\r\n 11 10 20260101000001.000000+000\r\n 12 11 20260101000002.000000+000\r\n 13 99 20260101000003.000000+000\nmalformed\n')
+    const inspector = createProcessInspector('win32', 'x64', fake.internals)
+    expect(inspector.foregroundPgid(10)).toBe(10)
+    expect(inspector.foregroundPgid(99)).toBeUndefined()
+    expect(inspector.isStdinWaiting(10)).toBe(false)
+    expect(inspector.processTree(10)).toEqual([
+      { pid: 12, started: '20260101000002.000000+000' },
+      { pid: 11, started: '20260101000001.000000+000' },
+      { pid: 10, started: '20260101000000.000000+000' },
+    ])
+    expect(inspector.processTree(99)).toEqual([])
+    expect(inspector.processSession(10)).toEqual([])
+    expect(inspector.isAlive({ pid: 11, started: '20260101000001.000000+000' })).toBe(true)
+    expect(inspector.isAlive({ pid: 11, started: 'reused' })).toBe(false)
+    inspector.signalGroup(10, 'SIGINT')
+    inspector.signalProcess({ pid: 11, started: '20260101000001.000000+000' }, 'SIGKILL')
+    inspector.signalProcess({ pid: 12, started: 'missing' }, 'SIGTERM')
+    expect(fake.kills).toEqual([[10, 'SIGINT'], [11, 'SIGKILL']])
+    expect(fake.kills.every(([pid]) => pid > 0)).toBe(true)
   })
 })

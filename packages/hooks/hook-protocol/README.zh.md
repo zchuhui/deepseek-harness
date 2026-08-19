@@ -42,3 +42,4 @@ Hook 调用／结果记录必须位于一个尚未结束的轮次内。`UserProm
 ## 已知限制与暂缓事项
 
 - **`HookOutput.updatedInput` 会被解析但不会应用**：输入改写是已暂缓的一致性设计问题（见 [pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)）；当 hook 设置它时，桥接会记录 + 警告。完整约定见 `src/types.ts`。
+- **Windows 上的 hook 命令是 PowerShell**：`runHook` 通过 `ctx.shell` 执行，Windows 上即 pwsh。`hooks.json` 里的 POSIX bash 不会被翻译；bash 或 `sh` shebang 会在协议层以结构化的非阻塞 `HookOutput` 失败。

@@ -99,6 +99,6 @@ The composition omits harness identity, workspace prompt text, skills, one-shot 
 
 `cwd` selects the workspace available to the agent, while `session_root` stores session logs and state. Use a fresh session id for an independent task; reuse an id only when the next call should continue the same conversation and persistent shell state.
 
-The composition uses `danger-full-access`. Run it only inside a disposable checkout or container: Bash and the editor can modify any path allowed to the runtime process. The persistent PTY backend requires a POSIX terminal substrate, so this composition does not support Windows agents.
+The composition uses `danger-full-access`. Run it only inside a disposable checkout or container: Bash and the editor can modify any path allowed to the runtime process. This example loads `terminal-bash`, so it does not run on Windows; Windows persistent terminals use [`dsh-terminal-pwsh`](../../../packages/terminal/terminal-pwsh/README.md) in an opt-in composition. See the [Windows guide](./windows.md).
 
 The [`jsonrpc-agent` example reference](../../../examples/jsonrpc-agent/README.md) owns the exact composition. The [Python SDK reference](../../../python/sdk/README.md) covers lifecycle, results, notifications, runtime selection, and configuration; the [Cordis primer](../../cordis-primer.md) covers composition syntax.

@@ -1,7 +1,8 @@
 /**
  * Process plumbing for the local subprocess service: detached process-tree
  * spawn with per-stream stdio dispositions, tail-keep collection with spill
- * files, tree-scoped signalling (POSIX groups; Windows taskkill), and the
+ * files, tree-scoped signalling (POSIX groups; Windows Job Objects with
+ * taskkill fallback), and the
  * SIGTERM→SIGKILL escalation. This layer reacts to an abort signal; callers
  * own deadlines, teardown ladders, and cause classification.
  * @module dsh-subprocess-local/spawn
@@ -25,6 +26,7 @@ import type {
   SubprocessSpawnSpec,
 } from '@deepseek-ai/dsh-subprocess'
 import { linuxProcessGroupHasLiveMembers } from './process-inspector.ts'
+import { attachKillOnCloseJob, type Win32Job } from './win32-job.ts'
 
 /**
  * Build a child environment: explicit caller entries override the scrubbed
@@ -52,6 +54,11 @@ export interface SpawnInternals {
   spillDir?: string
   /** Windows tree-termination runner (defaults to `taskkill /PID <pid> /T /F`). */
   taskkill?: (pid: number) => void
+  /**
+   * Assign the spawned Windows child to a kill-on-close Job Object.
+   * Defaults to {@link attachKillOnCloseJob}; tests inject a fake.
+   */
+  attachJob?: (pid: number) => Win32Job | undefined
   /** Host platform override for signalling decisions. */
   platform?: NodeJS.Platform
   /** Linux process-group member probe (defaults to `/proc` inspection). */
@@ -284,8 +291,8 @@ export function taskkillProcessTree(pid: number): void {
 /**
  * Signal a detached process tree with platform-correct semantics: POSIX
  * signals the negative process-group id and falls back to the direct child
- * when the group is gone; Windows terminates the tree via taskkill (any
- * signal value force-terminates — Node maps signals to TerminateProcess).
+ * when the group is gone; Windows terminates the Job Object when attached,
+ * otherwise `taskkill /T` (any signal value force-terminates).
  */
 function signalTree(
   platform: NodeJS.Platform,
@@ -293,8 +300,13 @@ function signalTree(
   sig: NodeJS.Signals,
   child: ChildProcess,
   taskkill: (pid: number) => void,
+  job: Win32Job | undefined,
 ): void {
   if (platform === 'win32') {
+    if (job !== undefined) {
+      job.terminate()
+      return
+    }
     taskkill(pid)
     return
   }
@@ -330,6 +342,7 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
   const spillDir = internals.spillDir ?? privateSpillDir()
   const platform = internals.platform ?? process.platform
   const taskkill = internals.taskkill ?? taskkillProcessTree
+  const attachJob = internals.attachJob ?? attachKillOnCloseJob
   const linuxGroupHasLiveMembers = internals.linuxProcessGroupHasLiveMembers ?? linuxProcessGroupHasLiveMembers
 
   if (spec.signal?.aborted) {
@@ -356,7 +369,7 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
       errMode === 'inherit' ? 'inherit' : 'pipe',
     ],
     // `detached` gives teardown a tree root on POSIX (its own process group);
-    // Windows terminates by root pid through taskkill /T instead.
+    // Windows terminates by Job Object when attached, otherwise root pid through taskkill /T.
     detached: platform !== 'win32',
   })
 
@@ -376,6 +389,7 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
 
   // Failed spawns use pid -1 so signalling remains a no-op.
   const pid = child.pid ?? -1
+  const job = platform === 'win32' && pid > 0 ? attachJob(pid) : undefined
 
   /** Whether the detached tree's root (or POSIX group) is still alive. */
   const treeAlive = (): boolean => {
@@ -384,8 +398,8 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
     if (treeExitObserved) return false
     if (pid <= 0) return false
     if (platform === 'win32') {
-      // Windows has no group-liveness probe; the direct child's exit is the
-      // observable boundary (taskkill /T already took the tree with it).
+      if (job !== undefined) return job.queryAlive()
+      // No job: the direct child's exit is the observable boundary (taskkill /T is the fallback).
       return child.exitCode === null && child.signalCode === null
     }
     try {
@@ -418,6 +432,7 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
     treeExitObservation ??= (async () => {
       while (treeAlive()) await sleepTick()
       treeExitObserved = true
+      job?.close()
       if (graceTimer !== undefined) clearTimeout(graceTimer)
       graceTimer = undefined
     })()
@@ -433,7 +448,7 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
     /* v8 ignore next -- the shared exit observer cancels the ordinary dead-tree timer;
        this remains the timer/death race guard and cannot be staged deterministically. */
     if (!treeAlive()) return
-    signalTree(platform, pid, sig, child, taskkill)
+    signalTree(platform, pid, sig, child, taskkill, job)
   }
 
   const terminate = (): void => {
@@ -441,7 +456,6 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
     // Observe from the first termination tier onward, even when inherited
     // pipes delay `done` and no consumer has begun its own teardown wait.
     void observeTreeExit()
-    // oxlint-disable-next-line typescript/no-unnecessary-condition -- observer can record absence before its first await.
     if (treeExitObserved) return
     kill('SIGTERM')
     // The escalation must survive direct-child settlement — the leader dying

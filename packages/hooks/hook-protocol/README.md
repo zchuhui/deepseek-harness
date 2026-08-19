@@ -42,3 +42,4 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 - **`HookOutput.updatedInput` is parsed but not honored** — input rewrite is a deferred consistency-design problem ([the pre-tool-input-rewrite Agent Note](../../../.agents/notes/proposed/feature/2026-06-30-pre-tool-input-rewrite.md)); a bridge logs + warns when a hook sets it. See `src/types.ts` for the full contracts.
+- **Windows hook commands are PowerShell** — `runHook` executes through `ctx.shell`, which is pwsh on Windows. POSIX bash in `hooks.json` is not translated; a bash or `sh` shebang fails at the protocol layer with a structured non-blocking `HookOutput`.

@@ -1,5 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# re-record only after confirming their content is equivalent.
-2026-08-15-windows-desktop-production-release.md: fc2b5e0e8d63c3d0f7b3f7cb49b36ba3c697ad2c
-2026-08-15-windows-desktop-production-release.zh.md: 0614ae5b51cb6b555b8dff44ff6ef5eddf22dee5

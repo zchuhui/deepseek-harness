@@ -10,4 +10,4 @@ The hooks subsystem lets users extend the agent at lifecycle points the way Clau
 | [`hooks-claude-code/`](hooks-claude-code/README.md) | Claude Code hook bridge | plugin |
 | [`hooks-codex/`](hooks-codex/README.md) | Codex hook bridge | plugin |
 
-The shared library owns common protocol behavior; each bridge owns its dialect-specific event mapping. The child READMEs document those contracts.
+The shared library owns common protocol behavior; each bridge owns its dialect-specific event mapping. The child READMEs document those contracts. On Windows, hook commands execute as PowerShell through `ctx.shell`; bash shebangs fail at the protocol layer.

@@ -244,7 +244,9 @@ abstract class PosixProcessInspector implements ProcessInspector {
   }
 }
 
-interface ProcessTreeEntry extends ProcessIdentity {
+/** One pid/parent/start-identity row from a process-table snapshot. */
+export interface ProcessTreeEntry extends ProcessIdentity {
+  /** Parent process id from the snapshot. */
   parentPid: number
 }
 
@@ -321,7 +323,17 @@ class LinuxProcessInspector extends PosixProcessInspector {
 interface PsEntry extends ProcessTreeEntry {}
 
 function macProcessTable(internals: ProcessInspectorInternals): PsEntry[] {
-  return internals.exec('/bin/ps', ['-axo', 'pid=,ppid=,lstart=']).split('\n').flatMap((line) => {
+  return parsePidParentStartTable(internals.exec('/bin/ps', ['-axo', 'pid=,ppid=,lstart=']))
+}
+
+/**
+ * Parse a `pid ppid started` process table used by macOS `ps` and Windows
+ * `Win32_Process` snapshots. Malformed lines are skipped.
+ * @param text - complete table text.
+ * @returns Parsed pid/parent/start-identity rows.
+ */
+export function parsePidParentStartTable(text: string): ProcessTreeEntry[] {
+  return text.split(/\r?\n/).flatMap((line) => {
     const match = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line)
     if (match?.[1] === undefined || match[2] === undefined || match[3] === undefined) return []
     return [{ pid: Number(match[1]), parentPid: Number(match[2]), started: match[3] }]
@@ -356,6 +368,58 @@ class MacProcessInspector extends PosixProcessInspector {
 
 }
 
+const WIN32_PROCESS_TABLE_COMMAND
+  = 'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.CreationDate)" }'
+
+function win32ProcessTable(internals: ProcessInspectorInternals): ProcessTreeEntry[] {
+  return parsePidParentStartTable(internals.exec('powershell.exe', [
+    '-NoLogo',
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    WIN32_PROCESS_TABLE_COMMAND,
+  ]))
+}
+
+/**
+ * Windows ConPTY inspector: trees come from a `Win32_Process` snapshot.
+ * There is no POSIX process group, so {@link foregroundPgid} returns the
+ * ConPTY root pid. {@link isStdinWaiting} is always unknown (`false`), matching macOS.
+ */
+class WindowsProcessInspector implements ProcessInspector {
+  constructor(private readonly internals: ProcessInspectorInternals) {}
+
+  foregroundPgid(shellPid: number): number | undefined {
+    return this.isAlive({ pid: shellPid, started: win32ProcessTable(this.internals).find(entry => entry.pid === shellPid)?.started ?? '' })
+      ? shellPid
+      : undefined
+  }
+
+  isStdinWaiting(_pgid: number): boolean {
+    return false
+  }
+
+  processTree(rootPid: number): ProcessIdentity[] {
+    return processTree(win32ProcessTable(this.internals), rootPid)
+  }
+
+  processSession(_sessionId: number): ProcessIdentity[] {
+    return []
+  }
+
+  isAlive(identity: ProcessIdentity): boolean {
+    return win32ProcessTable(this.internals).some(entry => entry.pid === identity.pid && entry.started === identity.started)
+  }
+
+  signalGroup(pgid: number, signal: SubprocessTerminalSignal): void {
+    this.internals.kill(pgid, signal)
+  }
+
+  signalProcess(identity: ProcessIdentity, signal: 'SIGTERM' | 'SIGKILL'): void {
+    if (this.isAlive(identity)) this.internals.kill(identity.pid, signal)
+  }
+}
+
 /**
  * Create the supported platform inspector or fail at plugin load.
  * @param platform - target Node platform.
@@ -370,5 +434,6 @@ export function createProcessInspector(
 ): ProcessInspector {
   if (platform === 'linux') return new LinuxProcessInspector(arch, internals)
   if (platform === 'darwin') return new MacProcessInspector(internals)
+  if (platform === 'win32') return new WindowsProcessInspector(internals)
   throw new Error(`subprocess-local: terminal inspection is unsupported on platform ${platform}`)
 }

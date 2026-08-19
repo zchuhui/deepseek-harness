@@ -10,6 +10,21 @@ import type { ShellExecutor } from '@deepseek-ai/dsh-shell'
 import { parseHookOutput } from './codec.ts'
 import type { CommandHook, HookOutput } from './types.ts'
 
+/** stderr when a bash shebang reaches the Windows PowerShell executor. */
+export const WINDOWS_BASH_HOOK_MESSAGE
+  = 'Windows hook commands run through PowerShell; a bash shebang cannot execute. Rewrite the command in PowerShell or run this composition on a POSIX host.'
+
+/**
+ * Detect a bash or POSIX `sh` shebang on the first line of a hook command.
+ * @param command - the `hooks.json` command string.
+ * @returns whether the command starts with a bash/`sh` shebang.
+ */
+export function commandHasBashShebang(command: string): boolean {
+  const [firstLine] = command.trimStart().split(/\r?\n/, 1)
+  if (firstLine === undefined) return false
+  return /^#!\s*(?:\/usr\/bin\/env\s+)?(?:\/(?:usr\/)?bin\/)?(?:ba)?sh\b/.test(firstLine)
+}
+
 /**
  * The reference default per-hook timeout, in ms (10 minutes) — the value both
  * Claude Code and Codex apply to a hook whose config sets no `timeout`. It
@@ -62,6 +77,7 @@ export interface RunHookResult {
  * @param hook - the configured command; its `timeoutSec` (wire unit: seconds) overrides the default timeout.
  * @param options - the invocation's payload, env, cwd, signal, stdin framing, and default timeout.
  * @param now - millisecond clock used for the reported duration.
+ * @param platform - host platform; Windows rejects bash shebang commands before spawn.
  * @returns the decoded output plus the run's wall-clock duration.
  */
 export async function runHook(
@@ -69,10 +85,18 @@ export async function runHook(
   hook: CommandHook,
   options: RunHookOptions,
   now: () => number,
+  platform: NodeJS.Platform = process.platform,
 ): Promise<RunHookResult> {
   const started = now()
   const timeoutMs = hook.timeoutSec !== undefined ? hook.timeoutSec * 1000 : options.defaultTimeoutMs
   const stdin = JSON.stringify(options.payload) + (options.trailingNewline ? '\n' : '')
+
+  if (platform === 'win32' && commandHasBashShebang(hook.command)) {
+    return {
+      output: parseHookOutput(undefined, '', WINDOWS_BASH_HOOK_MESSAGE),
+      durationMs: now() - started,
+    }
+  }
 
   const request = {
     command: hook.command,
